@@ -1,5 +1,7 @@
 # escpos-rs: A Rust crate for thermal printers
 
+**Work in progress**
+
 Escpos-rs builds a bit on top of `escpospp`, which aims to bring relatively easy communication to thermal printers that understand the ESC/POS protocol. Here is an example of a simple print with `escpos-rs`
 
 ```rust
