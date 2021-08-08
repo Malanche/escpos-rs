@@ -3,6 +3,7 @@ extern crate serde;
 use super::{Charset, Font, CodeTable};
 use serde::{Serialize, Deserialize};
 
+/// Common commands usefull for the printer
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Command {
     /// Cuts the paper after 0x96 vertical spaces
@@ -38,6 +39,7 @@ pub enum Command {
 }
 
 impl Command {
+    /// Returns the byte-array representation of each command
     pub fn as_bytes(&self) -> Vec<u8> {
         match self {
             Command::Cut => vec![0x1d, 0x56, 0x41, 0x96],

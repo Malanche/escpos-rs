@@ -1,3 +1,4 @@
+/// Possible custom errors for the library
 #[derive(Debug)]
 pub enum Error {
     /// Error related to libusb
@@ -8,6 +9,7 @@ pub enum Error {
     ImageError(image::ImageError),
     /// This means no bulk endpoint could be found
     NoBulkEndpoint,
+    /// No replacement string for an instruction was found
     NoReplacementFound(String),
     PrinterError(String),
     WrongMarkdown,

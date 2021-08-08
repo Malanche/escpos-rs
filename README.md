@@ -29,6 +29,37 @@ fn main() {
 }
 ```
 
+## Connecting to a printer
+
+In order to connect to a printer, you need to know both the vendor id, and the product id of your printer. Commonly known printers have these details published online, while for the least common you will have at least the following two options
+
+* Some printers do print their information on test prints (often holding the feed button)
+* If you are on linux, the `lsusb` command shows you this information.
+
+With this information, you can start a connection to the printer
+
+```rust
+let context = Context::new().unwrap();
+// Here goes the vendor id, and the product it (in that order)
+let mut printer_details = PrinterDetails::builder(0x0001, 0x0001).build();
+// We pass it to the printer
+let printer = match Printer::with_context(&context, printer_details) {
+    Ok(maybe_printer) => match maybe_printer {
+        Some(printer) => printer,
+        None => panic!("No printer was found :(")
+    },
+    Err(e) => panic!("Error: {}", e)
+};
+```
+
+## Sending raw information, plus commands
+
+The printer has the `raw` method, which allows you to send raw bytes to the printer
+
+## Network functionality
+
+To be added soon.
+
 ## The Instruction structure
 
 The Instruction structure has as primary goal the construction of a __template__, which can be used to print multiple documents with dynamic data.

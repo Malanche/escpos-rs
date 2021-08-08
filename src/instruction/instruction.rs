@@ -6,7 +6,7 @@ extern crate qrcode;
 use qrcode::QrCode;
 use codepage_437::{IntoCp437, CP437_CONTROL};
 use crate::{
-    Error, PrinterDetails,
+    Error, PrinterProfile,
     command::{Command, Font}
 };
 use serde::{Serialize, Deserialize};
@@ -257,12 +257,12 @@ impl Instruction {
     }
 
     /// Main serialization function
-    pub(crate) fn to_vec(&self, printer_details: &PrinterDetails, print_data: &PrintData) -> Result<Vec<u8>, Error> {
+    pub(crate) fn to_vec(&self, printer_profile: &PrinterProfile, print_data: &PrintData) -> Result<Vec<u8>, Error> {
         let mut target = Vec::new();
         match self {
             Instruction::Compound{instructions} => {
                 for instruction in instructions {
-                    target.append(&mut instruction.to_vec(printer_details, print_data)?);
+                    target.append(&mut instruction.to_vec(printer_profile, print_data)?);
                 }
             },
             Instruction::Cut => {
@@ -280,7 +280,7 @@ impl Instruction {
             Instruction::QRCode{name} => {
                 if let Some(qr_contents) = &print_data.qr_contents {
                     if let Some(qr_content) = qr_contents.get(name) {
-                        target.extend_from_slice(&Instruction::qr_code(qr_content.clone())?.to_vec(printer_details, print_data)?)
+                        target.extend_from_slice(&Instruction::qr_code(qr_content.clone())?.to_vec(printer_profile, print_data)?)
                     } else {
                         return Err(Error::NoQrContent(name.clone()))
                     }
@@ -294,7 +294,7 @@ impl Instruction {
                 target.append(&mut Command::SelectFont{font: font.clone()}.as_bytes());
 
                 // We extract the width for this font
-                let width = match printer_details.width_per_font.get(&font) {
+                let width = match printer_profile.columns_per_font.get(&font) {
                     Some(w) => *w,
                     None => return Err(Error::NoWidth)
                 };
@@ -365,7 +365,7 @@ impl Instruction {
             },
             Instruction::DuoTable{name, header, font} => {
                 // We extract the width for this font
-                let width = match printer_details.width_per_font.get(&font) {
+                let width = match printer_profile.columns_per_font.get(&font) {
                     Some(w) => *w,
                     None => return Err(Error::NoWidth)
                 };
@@ -415,7 +415,7 @@ impl Instruction {
                 }
 
                 // We chose a font
-                let width = match printer_details.width_per_font.get(&Font::FontA) {
+                let width = match printer_profile.columns_per_font.get(&Font::FontA) {
                     Some(w) => *w,
                     None => return Err(Error::NoWidth)
                 } as usize;
@@ -490,7 +490,7 @@ impl Instruction {
                 }
 
                 // We chose a font
-                let width = match printer_details.width_per_font.get(&Font::FontA) {
+                let width = match printer_profile.columns_per_font.get(&Font::FontA) {
                     Some(w) => *w,
                     None => return Err(Error::NoWidth)
                 } as usize;

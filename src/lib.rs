@@ -29,7 +29,7 @@
 //!
 //! ## Printer Details
 //!
-//! In order to print, some data about the printer must be known. The [PrinterDetails](crate::PrinterDetails) structure fulfills this purpose.
+//! In order to print, some data about the printer must be known. The [PrinterProfile](crate::PrinterProfile) structure fulfills this purpose.
 //!
 //! The strict minimum information needed to print, are the vendor id, the product id. Both vendor and product id should be found in the maker's website, or sometimes they get printed in test prints (which usually occur if you hold the feed button on the printer).
 //!
@@ -41,7 +41,7 @@
 //!
 //! ```rust
 //! use escpos_rs::{
-//!     Printer, PrintData, PrinterDetails,
+//!     Printer, PrintData, PrinterProfile,
 //!     Instruction, Justification, command::Font
 //! };
 //! use libusb::{Context};
@@ -50,7 +50,7 @@
 //!     // We create a usb contest for the printer
 //!     let context = Context::new().unwrap();
 //!     // Printer details...
-//!     let printer_details = PrinterDetails::builder(0x0001, 0x0001)
+//!     let printer_details = PrinterProfile::builder(0x0001, 0x0001)
 //!         .with_font_width(Font::FontA, 32)
 //!         .build();
 //!     // We pass it to the printer
@@ -91,7 +91,7 @@
 //! }
 //! ```
 
-pub use printer::{Printer, PrinterDetails, PrinterDetailsBuilder, PrinterModel};
+pub use printer::{Printer, PrinterProfile, PrinterProfileBuilder, PrinterModel};
 pub use instruction::{Instruction, Justification, PrintData, PrintDataBuilder};
 pub use error::{Error};
 
