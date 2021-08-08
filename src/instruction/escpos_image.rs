@@ -53,19 +53,19 @@ impl EscposImage {
         let aspect_ratio = (width as f64)/(sc_height as f64);
         
         // Each row will contain the information of 8 rows from the picture
-        //const printer_width: usize = 384;
-        const printer_width: usize = 576;
-        let mut printer_rows: Vec<[u8; printer_width]> = Vec::new();
+        //const PRINTER_WIDTH: usize = 384;
+        const PRINTER_WIDTH: usize = 576;
+        let mut printer_rows: Vec<[u8; PRINTER_WIDTH]> = Vec::new();
 
         // El *3 es por la baja densidad de impresión horizontal (1 byte en lugar de 3)
-        let new_height = ((printer_width as f64)/(aspect_ratio*3.0)).floor() as u32;
+        let new_height = ((PRINTER_WIDTH as f64)/(aspect_ratio*3.0)).floor() as u32;
         
-        let b = image::imageops::resize(&cropped, printer_width as u32, new_height, image::imageops::FilterType::Nearest);
+        let b = image::imageops::resize(&cropped, PRINTER_WIDTH as u32, new_height, image::imageops::FilterType::Nearest);
 
         for (y, pixel_row) in b.enumerate_rows() {
             // Here we iterate over each row of the image.
             if y%8 == 0 {
-                printer_rows.push([0; printer_width]);
+                printer_rows.push([0; PRINTER_WIDTH]);
             }
             let row = printer_rows.get_mut((y/8) as usize).unwrap();
             // Here, we iterate horizontally this time
@@ -106,8 +106,8 @@ impl EscposImage {
             let m = 0x01;
             feed.push(m);
             // The formula on how many pixels we will do, is nL + nH * 256
-            feed.push((printer_width % 256) as u8); // nL
-            feed.push((printer_width / 256) as u8); // nH
+            feed.push((PRINTER_WIDTH % 256) as u8); // nL
+            feed.push((PRINTER_WIDTH / 256) as u8); // nH
             // feed.push(0x80); // nL
             // feed.push(0x01); // nH
             feed.extend_from_slice(printer_row);

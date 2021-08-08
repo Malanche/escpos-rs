@@ -6,7 +6,7 @@ extern crate qrcode;
 use qrcode::QrCode;
 use codepage_437::{IntoCp437, CP437_CONTROL};
 use crate::{
-    Printer, Error, PrinterDetails,
+    Error, PrinterDetails,
     command::{Command, Font}
 };
 use serde::{Serialize, Deserialize};
