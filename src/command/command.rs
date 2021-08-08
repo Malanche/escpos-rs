@@ -69,27 +69,3 @@ impl Command {
         }
     }
 }
-
-/*
-//Cuts the paper after \x96 vertical spaces
- CUT = {'\x1d', '\x56', '\x41', '\x96'};
-//Equivalent to ESC @
-std::string RESET = {'\x1d', '\x40'};
-//Equivalent to ESC M n for font type A
-std::string FONT_A = {'\x1b', '\x4d', '\x00'};
-//Equivalent to ESC M n for font type B
-std::string FONT_B = {'\x1b', '\x4d', '\x01'};
-// Equivalent to ESC - n for underline text
-std::string UNDERLINE_OFF = {'\x1b', '\x2d', '\x00'};
-std::string UNDERLINE_1_DOT = {'\x1b', '\x2d', '\x01'};
-std::string UNDERLINE_2_DOT = {'\x1b', '\x2d', '\x02'};
-// Equivalent to ESC
-std::string BOLD_ON = {'\x1b', '\x45', '\x01'};
-std::string BOLD_OFF = {'\x1b', '\x45', '\x00'};
-// Equivalent to ESC * m=0
-std::string BITMAP = {'\x1b', '\x2a'};
-// Change line size
-std::string NO_LINE = {'\x1b', '\x33', (unsigned char) 0};
-// Reset line Size
-std::string RESET_LINE = {'\x1b', '\x32'};
-*/

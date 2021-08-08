@@ -2,7 +2,6 @@ use crate::command::{Font};
 use std::collections::HashMap;
 
 pub struct PrintData {
-    pub(crate) widths: HashMap<Font, u8>,
     pub(crate) replacements: HashMap<String, String>,
     pub(crate) duo_tables: Option<HashMap<String, Vec<(String, String)>>>,
     pub(crate) trio_tables: Option<HashMap<String, Vec<(String, String, String)>>>,
@@ -10,8 +9,14 @@ pub struct PrintData {
     pub(crate) qr_contents: Option<HashMap<String, String>>
 }
 
+impl PrintData {
+    /// Constructs a new print data builder
+    pub fn builder() -> PrintDataBuilder {
+        PrintDataBuilder::new()
+    }
+}
+
 pub struct PrintDataBuilder {
-    widths: HashMap<Font, u8>,
     replacements: HashMap<String, String>,
     duo_tables: Option<HashMap<String, Vec<(String, String)>>>,
     trio_tables: Option<HashMap<String, Vec<(String, String, String)>>>,
@@ -20,9 +25,9 @@ pub struct PrintDataBuilder {
 }
 
 impl PrintDataBuilder {
+    /// Creates a new print data builder
     pub fn new() -> PrintDataBuilder {
         PrintDataBuilder {
-            widths: HashMap::new(),
             replacements: HashMap::new(),
             duo_tables: None,
             trio_tables: None,
@@ -31,12 +36,19 @@ impl PrintDataBuilder {
         }
     }
 
-    pub fn set_font_width(mut self, font: Font, width: u8) -> Self {
-        self.widths.insert(font, width);
-        self
-    }
-
-    pub fn add_replacement<A: Into<String>, B: Into<String>>(mut self, target: A, replacement: B) -> Self {
+    /// Adds a replacement string
+    ///
+    /// Replacement strings are a simple pattern matching replacement, where all matching instances of `target` get replaces by `replacement`
+    ///
+    /// ```rust
+    /// let print_data = PrintDataBuilder::new()
+    ///     // Instances of "%name%" will get replaced with "Carlos"
+    ///     .add_replacement("%name%", "Carlos")
+    ///     .build();
+    /// ```
+    ///
+    /// Note that there is no particular syntax for the `target` string. `"%name%"` is used in the example so that the word "name" (in case it appears in the text) is safe from this instruction.
+    pub fn replacement<A: Into<String>, B: Into<String>>(mut self, target: A, replacement: B) -> Self {
         self.replacements.insert(target.into(), replacement.into());
         self
     }
@@ -79,7 +91,6 @@ impl PrintDataBuilder {
 
     pub fn build(self) -> PrintData {
         PrintData {
-            widths: self.widths,
             replacements: self.replacements,
             duo_tables: self.duo_tables,
             trio_tables: self.trio_tables,

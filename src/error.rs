@@ -6,6 +6,8 @@ pub enum Error {
     CP437Error(String),
     /// Error regarding image treatment
     ImageError(image::ImageError),
+    /// This means no bulk endpoint could be found
+    NoBulkEndpoint,
     NoReplacementFound(String),
     PrinterError(String),
     WrongMarkdown,
@@ -23,6 +25,7 @@ impl std::fmt::Display for Error {
             Error::LibusbError(e) => format!("Libusb error: {}", e),
             Error::CP437Error(detail) => format!("CP437 error: {}", detail),
             Error::ImageError(e) => format!("Image error: {}", e),
+            Error::NoBulkEndpoint => format!("No bulk endpoint could be found"),
             Error::NoReplacementFound(replacement) => format!("Could not find replacement for tag {{{}}}", replacement),
             Error::PrinterError(detail) => format!("An error occured while printing, {}", detail),
             Error::WrongMarkdown => format!("Incorrect markdown structure"),

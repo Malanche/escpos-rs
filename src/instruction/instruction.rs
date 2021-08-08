@@ -6,13 +6,18 @@ extern crate qrcode;
 use qrcode::QrCode;
 use codepage_437::{IntoCp437, CP437_CONTROL};
 use crate::{
-    Printer, Error,
+    Printer, Error, PrinterDetails,
     command::{Command, Font}
 };
 use serde::{Serialize, Deserialize};
 use super::{Justification, PrintData, EscposImage};
 use std::collections::HashSet;
 
+/// Templates for recurrent prints
+///
+/// The [Instruction](crate::Instruction) structure allows the creation of template prints, which could contain certain data that should change between prints (be it text, tables, or even qr codes).
+///
+/// It is not adviced to construct the variants of the enum manually, read the available functions to guarantee a predictable outcome.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind")]
 pub enum Instruction {
@@ -148,14 +153,6 @@ impl Instruction {
         }
     }
 
-    /// Function to print the instruction
-    ///
-    /// A valid reference to a printer must be supplied, along with the print data for the specific instruction.
-    pub fn print<'a>(&self, printer: &Printer<'a>, print_data: &PrintData) -> Result<(), Error> {
-        let content = self.to_vec(print_data)?;
-        printer.raw(content)
-    }
-
     /// Sends simple text to the printer.
     ///
     /// The markdown flag allows for markdown text interpretation, which understands a little subset of Markdown, mainly:
@@ -163,9 +160,9 @@ impl Instruction {
     ///  * Bold font, with **
     ///  * Italics, with _
     ///  * Strike
-    pub fn text(content: String, font: Font, justification: Justification, replacements: Option<HashSet<String>>) -> Instruction {
+    pub fn text<A: Into<String>>(content: A, font: Font, justification: Justification, replacements: Option<HashSet<String>>) -> Instruction {
         Instruction::Text {
-            content,
+            content: content.into(),
             markdown: false,
             font,
             justification,
@@ -260,12 +257,12 @@ impl Instruction {
     }
 
     /// Main serialization function
-    pub(crate) fn to_vec(&self, print_data: &PrintData) -> Result<Vec<u8>, Error> {
+    pub(crate) fn to_vec(&self, printer_details: &PrinterDetails, print_data: &PrintData) -> Result<Vec<u8>, Error> {
         let mut target = Vec::new();
         match self {
             Instruction::Compound{instructions} => {
                 for instruction in instructions {
-                    target.append(&mut instruction.to_vec(print_data)?);
+                    target.append(&mut instruction.to_vec(printer_details, print_data)?);
                 }
             },
             Instruction::Cut => {
@@ -283,7 +280,7 @@ impl Instruction {
             Instruction::QRCode{name} => {
                 if let Some(qr_contents) = &print_data.qr_contents {
                     if let Some(qr_content) = qr_contents.get(name) {
-                        target.extend_from_slice(&Instruction::qr_code(qr_content.clone())?.to_vec(print_data)?)
+                        target.extend_from_slice(&Instruction::qr_code(qr_content.clone())?.to_vec(printer_details, print_data)?)
                     } else {
                         return Err(Error::NoQrContent(name.clone()))
                     }
@@ -297,7 +294,7 @@ impl Instruction {
                 target.append(&mut Command::SelectFont{font: font.clone()}.as_bytes());
 
                 // We extract the width for this font
-                let width = match print_data.widths.get(&font) {
+                let width = match printer_details.width_per_font.get(&font) {
                     Some(w) => *w,
                     None => return Err(Error::NoWidth)
                 };
@@ -307,7 +304,7 @@ impl Instruction {
                 if let Some(self_replacements) = &self_replacements {
                     for key in self_replacements.iter() {
                         if let Some(replacement) = print_data.replacements.get(key) {
-                            replaced_string = replaced_string.as_str().replace(&format!("{{{}}}", key), replacement);
+                            replaced_string = replaced_string.as_str().replace(key, replacement);
                         } else {
                             return Err(Error::NoReplacementFound(key.clone()))
                         }
@@ -368,7 +365,7 @@ impl Instruction {
             },
             Instruction::DuoTable{name, header, font} => {
                 // We extract the width for this font
-                let width = match print_data.widths.get(&font) {
+                let width = match printer_details.width_per_font.get(&font) {
                     Some(w) => *w,
                     None => return Err(Error::NoWidth)
                 };
@@ -418,7 +415,7 @@ impl Instruction {
                 }
 
                 // We chose a font
-                let width = match print_data.widths.get(&Font::FontA) {
+                let width = match printer_details.width_per_font.get(&Font::FontA) {
                     Some(w) => *w,
                     None => return Err(Error::NoWidth)
                 } as usize;
@@ -493,7 +490,7 @@ impl Instruction {
                 }
 
                 // We chose a font
-                let width = match print_data.widths.get(&Font::FontA) {
+                let width = match printer_details.width_per_font.get(&Font::FontA) {
                     Some(w) => *w,
                     None => return Err(Error::NoWidth)
                 } as usize;

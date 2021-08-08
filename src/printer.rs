@@ -28,31 +28,120 @@ pub struct PrinterDetails {
     /// product id for the printer
     product_id: u16,
     /// Paper width, in characters, for the printer
-    width_per_font: HashMap<Font, u8>,
+    pub(crate) width_per_font: HashMap<Font, u8>,
     /// Endpoint where the usb data is meant to be written to
-    endpoint: u8
+    endpoint: Option<u8>,
+    /// Timeout for bulk write operations
+    timeout: std::time::Duration
 }
 
 impl PrinterDetails {
     /// Create custom printing details
-    pub fn new(vendor_id: u16, product_id: u16, endpoint: u8, width_per_font: HashMap<Font, u8>) -> PrinterDetails {
+    ///
+    /// Not recommended to use, as it contains a lot of arguments. See the [builder](PrinterDetails::builder) function instead.
+    pub fn new(vendor_id: u16, product_id: u16, width_per_font: HashMap<Font, u8>, endpoint: Option<u8>, timeout: std::time::Duration) -> PrinterDetails {
         PrinterDetails {
             vendor_id,
             product_id,
             width_per_font,
-            endpoint
+            endpoint,
+            timeout
         }
     }
 
-    /// Creates printer details with minimum information to print
+    /// Creates a [PrinterDetailsBuilder](crate::PrinterDetailsBuilder)
     ///
-    /// Should only be used for quick testing, as things like justification will not work when using this kind of printing details
-    pub fn minimum(vendor_id: u16, product_id: u16) -> PrinterDetails {
-        PrinterDetails {
+    /// Equivalent to a call to [PrinterDetailsBuilder](crate::PrinterDetailsBuilder)'s [new](crate::PrinterDetailsBuilder::new) function.
+    /// ```rust
+    /// // Creates a minimum data structure to connect to a printer
+    /// let printer_details = PrinterDetails::builder().build();
+    /// ```
+    pub fn builder(vendor_id: u16, product_id: u16) -> PrinterDetailsBuilder {
+        PrinterDetailsBuilder::new(vendor_id, product_id)
+    }
+}
+
+/// Helper structure to create [PrinterDetails](crate::PrinterDetails)
+///
+/// Builder pattern for the [PrinterDetails](crate::PrinterDetails) structure.
+pub struct PrinterDetailsBuilder {
+    vendor_id: u16,
+    product_id: u16,
+    width_per_font: HashMap<Font, u8>,
+    endpoint: Option<u8>,
+    timeout: std::time::Duration
+}
+
+impl PrinterDetailsBuilder {
+    /// Creates a new [PrinterDetailsBuilder](crate::PrinterDetailsBuilder)
+    ///
+    /// ```rust
+    /// // Creates a minimum (probably non-working) data structure to connect to a printer
+    /// let printer_details = PrinterDetailsBuilder::new(0x0001, 0x0001).build();
+    /// ```
+    ///
+    /// The data structure will be properly built just with the vendor id and the product id. The [Printer](crate::Printer)'s [with_context](crate::Printer::with_context) method will try to locate a bulk write endpoint, but it might fail to do so. See [with_endpoint](PrinterDetailsBuilder::with_endpoint) for manual setup.
+    pub fn new(vendor_id: u16, product_id: u16) -> PrinterDetailsBuilder {
+        PrinterDetailsBuilder {
             vendor_id,
             product_id,
             width_per_font: HashMap::new(),
-            endpoint: 0x01
+            endpoint: None,
+            timeout: std::time::Duration::from_secs(2)
+        }
+    }
+
+    /// Sets the usb endpoint to which the data will be written.
+    ///
+    /// ```rust
+    /// // Creates the printer details with the endpoint 0x02
+    /// let printer_details = PrinterDetailsBuilder::new(0x0001, 0x0001)
+    ///     .with_endpoint(0x02)
+    ///     .build();
+    /// ```
+    pub fn with_endpoint(mut self, endpoint: u8) -> PrinterDetailsBuilder {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    /// Adds a specific width per font
+    ///
+    /// This allows the justification, and proper word splitting to work. If you feel insecure about what value to use, the default font (FontA) usually has 32 characters of width for 58mm paper printers, and 48 for 80mm paper. You can also look for the specsheet, or do trial and error.
+    /// ```rust
+    /// let printer_details = PrinterDetailsBuilder::new(0x0001, 0x0001)
+    ///     .with_font_width(Font::FontA, 32)
+    ///     .build();
+    /// ```
+    pub fn with_font_width(mut self, font: Font, width: u8) -> PrinterDetailsBuilder {
+        self.width_per_font.insert(font, width);
+        self
+    }
+
+    /// Adds a bulk write timeout
+    ///
+    /// USB devices might fail to write to the bulk endpoint. In such a case, a timeout must be provided to know when to stop waiting for the buffer to flush to the printer. The default value is 2 seconds.
+    /// ```rust
+    /// let printer_details = PrinterDetailsBuilder::new(0x0001, 0x0001)
+    ///     .with_timeout(std::time::Duration::from_secs(3))
+    ///     .build();
+    /// ```
+    pub fn with_timeout(mut self, timeout: std::time::Duration) -> PrinterDetailsBuilder {
+        self.timeout = timeout;
+        self
+    }
+
+    /// Build the `PrinterDetails` that lies beneath the builder
+    ///
+    /// ```rust
+    /// let printer_details = PrinterDetailsBuilder::new(0x0001, 0x0001).build();
+    /// ```
+    pub fn build(self) -> PrinterDetails {
+        PrinterDetails {
+            vendor_id: self.vendor_id,
+            product_id: self.product_id,
+            width_per_font: self.width_per_font,
+            endpoint: self.endpoint,
+            timeout: self.timeout
         }
     }
 }
@@ -60,7 +149,7 @@ impl PrinterDetails {
 
 /// Printers known to this library
 ///
-/// Probably needs updates. Feel free to add in your own, or send them to me through email to add them here.
+/// Probably needs updates. If you know one that is not in the list, send them to the author through email to be considered in future updates.
 pub enum PrinterModel {
     /// ZKTeco mini printer
     ZKTeco,
@@ -86,7 +175,8 @@ impl PrinterModel {
                     vendor_id,
                     product_id,
                     width_per_font: vec![(Font::FontA, 32)].into_iter().collect(),
-                    endpoint: 0x02
+                    endpoint: Some(0x02),
+                    timeout: std::time::Duration::from_secs(2)
                 }
             },
             PrinterModel::TMT20 => {
@@ -94,7 +184,8 @@ impl PrinterModel {
                     vendor_id,
                     product_id,
                     width_per_font: vec![(Font::FontA, 48)].into_iter().collect(),
-                    endpoint: 0x01
+                    endpoint: Some(0x01),
+                    timeout: std::time::Duration::from_secs(2)
                 }
             }
         }
@@ -124,6 +215,8 @@ impl PrinterModel {
 /// ```
 pub struct Printer<'a> {
     printer_details: PrinterDetails,
+    /// Bulk write endpoint
+    endpoint: u8,
     dh: DeviceHandle<'a>
 }
 
@@ -133,10 +226,39 @@ impl<'a> Printer<'a> {
     /// Creates the printer with the given details, from the printer details provided, and in the given USB context.
     pub fn with_context(context: &'a Context, printer_details: PrinterDetails) -> Result<Option<Printer<'a>>, Error> {
         let (vendor_id, product_id) = (printer_details.vendor_id, printer_details.product_id);
-        let devices = context.devices().unwrap();
+        let devices = context.devices().map_err(|e| Error::LibusbError(e))?;
         for device in devices.iter() {
-            let s = device.device_descriptor().unwrap();
+            let s = device.device_descriptor().map_err(|e| Error::LibusbError(e))?;
             if s.vendor_id() == vendor_id && s.product_id() == product_id {
+                // Before opening the device, we must find the bulk endpoint
+                let config_descriptor = device.active_config_descriptor().map_err(|e| Error::LibusbError(e))?;
+                let endpoint = if let Some(endpoint) = printer_details.endpoint {
+                    endpoint
+                } else {
+                    let mut detected_endpoint: Option<u8> = None;
+                    // Horrible to have 3 nested for, but so be it
+                    for interface in config_descriptor.interfaces() {
+                        for descriptor in interface.descriptors() {
+                            for endpoint in descriptor.endpoint_descriptors() {
+                                match (endpoint.transfer_type(), endpoint.direction()) {
+                                    (libusb::TransferType::Bulk, libusb::Direction::Out) => if detected_endpoint.is_none() {
+                                        detected_endpoint = Some(endpoint.number());
+                                    },
+                                    _ => ()
+                                };
+                            }
+                        }
+                    }
+    
+                    if let Some(endpoint) = detected_endpoint {
+                        endpoint
+                    } else {
+                        return Err(Error::NoBulkEndpoint);
+                    }
+                };
+
+                // Now we continue opening the device
+
                 match device.open() {
                     Ok(mut dh) => {
                         if let Ok(active) = dh.kernel_driver_active(0) {
@@ -157,6 +279,7 @@ impl<'a> Printer<'a> {
                         }
                         return Ok(Some(Printer {
                             printer_details,
+                            endpoint,
                             dh
                         }));
                     },
@@ -164,6 +287,7 @@ impl<'a> Printer<'a> {
                 };
             }
         }
+        // No printer was found with such vid and pid
         Ok(None)
     }
 
@@ -195,16 +319,15 @@ impl<'a> Printer<'a> {
     /// Print an instruction
     ///
     /// You can pass optional printer data to the printer to fill in the dynamic parts of the instruction.
-    pub fn instruction(&self, instruction: &Instruction, print_data: &PrintData) -> Result<(), String> {
-        let content = instruction.to_vec(print_data).unwrap();
-        Ok(self.raw(content).unwrap())//.map_err(|e| Error::PrinterError(e))
+    pub fn instruction(&self, instruction: &Instruction, print_data: &PrintData) -> Result<(), Error> {
+        let content = instruction.to_vec(&self.printer_details, print_data).unwrap();
+        self.raw(&content)
     }
 
     /// Print some text. By default, there is line skipping with spaces as newlines (when the text does not fit). At the end, no newline is added.
     pub fn print<T: AsRef<str>>(&self, content: T) -> Result<(), Error> {
         let feed = String::from(content.as_ref()).into_cp437(&CP437_CONTROL).map_err(|e| Error::CP437Error(e.into_string()))?;
-        //let feed = content.as_ref().as_bytes().to_vec();
-        self.raw(feed)
+        self.raw(&feed)
     }
 
     /// Print some text.
@@ -212,18 +335,18 @@ impl<'a> Printer<'a> {
     /// By default, there is line skipping with spaces as newlines (when the text does not fit, assuming a width for at least one font was provided, else the text will split exacty where the line is full). At the end, no newline is added.
     pub fn println<T: AsRef<str>>(&self, content: T) -> Result<(), Error> {
         let feed = String::from(content.as_ref()) + "\n";
-        self.print(feed)
+        self.print(&feed)
     }
 
     /// Cuts the paper, in case the instruction is supported by the printer
     pub fn cut(&self) -> Result<(), Error> {
-        self.raw(Command::Cut.as_bytes())
+        self.raw(&Command::Cut.as_bytes())
     }
 
-    /// Jumps a number of lines (to leave whitespaces). Basically n * '\n' passed to `print`
+    /// Jumps _n_ number of lines (to leave whitespaces). Basically `n * '\n'` passed to `print`
     pub fn jump(&self, n: u8) -> Result<(), Error> {
         let feed = vec!['\n' as u8, n];
-        self.raw(feed)
+        self.raw(&feed)
     }
 
     /// Prints a table with two columns. The sum of lengths of both strings
@@ -240,16 +363,7 @@ impl<'a> Printer<'a> {
             feed.append(&mut pair.1.as_bytes().to_vec());
             feed.push('\n' as u8);
         }
-        self.raw(feed)
-    }
-
-    pub fn raw(&self, bytes: Vec<u8>) -> Result<(), Error> {
-        self.dh.write_bulk(
-            self.printer_details.endpoint,
-            &bytes,
-            std::time::Duration::from_secs(3)
-        ).map_err(|e| Error::LibusbError(e))?;
-        Ok(())
+        self.raw(&feed)
     }
 
     pub fn image<T: AsRef<Path>>(&self, path: T) -> Result<(), Error> {
@@ -314,6 +428,22 @@ impl<'a> Printer<'a> {
         }
         feed.extend_from_slice(&Command::ResetLine.as_bytes());
         feed.extend_from_slice(&Command::Reset.as_bytes());
-        self.raw(feed)
+        self.raw(&feed)
+    }
+
+    /// Sends raw information to the printer
+    ///
+    /// As simple as it sounds
+    /// ```rust
+    /// let bytes = vec![0x01, 0x02];
+    /// printer.raw(bytes)
+    /// ```
+    pub fn raw(&self, bytes: &Vec<u8>) -> Result<(), Error> {
+        self.dh.write_bulk(
+            self.endpoint,
+            bytes,
+            self.printer_details.timeout
+        ).map_err(|e| Error::LibusbError(e))?;
+        Ok(())
     }
 }
