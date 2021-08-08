@@ -7,6 +7,9 @@ use crate::{Error, command::{Command}};
 use image::{DynamicImage, GenericImageView, Pixel};
 use serde::{Serialize, Deserialize, ser::Serializer, de::Deserializer};
 
+/// Image adapted to the printer.
+///
+/// The EscposImage structure keeps the original image, and contains a cache for constructed images for specific printer widths
 #[derive(Clone, Debug)]
 pub struct EscposImage {
     source: String,
