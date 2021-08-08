@@ -1,18 +1,18 @@
 # escpos-rs: A Rust crate for thermal printers
 
-**Work in progress**
+**Work in progress. Not ready for production.**
 
 Escpos-rs builds a bit on top of `escpospp`, which aims to bring relatively easy communication to thermal printers that understand the ESC/POS protocol. Here is an example of a simple print with `escpos-rs`
 
 ```rust
-use escpos_rs::{Printer, PrinterDetails};
+use escpos_rs::{Printer, PrinterProfile};
 use libusb::{Context};
 
 fn main() {
     // We create a usb contest for the printer
     let context = Context::new().unwrap();
     // We create the printer details
-    let mut printer_details = PrinterDetails::builder(0x0001, 0x0001).build();
+    let mut printer_details = PrinterProfile::builder(0x0001, 0x0001).build();
     // We pass it to the printer
     let printer = match Printer::with_context(&context, printer_details) {
         Ok(maybe_printer) => match maybe_printer {
@@ -41,7 +41,7 @@ With this information, you can start a connection to the printer
 ```rust
 let context = Context::new().unwrap();
 // Here goes the vendor id, and the product it (in that order)
-let mut printer_details = PrinterDetails::builder(0x0001, 0x0001).build();
+let mut printer_details = PrinterProfile::builder(0x0001, 0x0001).build();
 // We pass it to the printer
 let printer = match Printer::with_context(&context, printer_details) {
     Ok(maybe_printer) => match maybe_printer {
@@ -52,9 +52,71 @@ let printer = match Printer::with_context(&context, printer_details) {
 };
 ```
 
-## Sending raw information, plus commands
+## Sending raw information
 
-The printer has the `raw` method, which allows you to send raw bytes to the printer
+The printer has the `raw` method, which allows you to send raw bytes to the printer. Pretty straightforward if you need to operate on the low-level.
+
+```rust
+
+use libusb::{Context};
+use escpos_rs::{
+    Printer, PrinterModel,
+    command::Command
+};
+
+fn main() {
+    let context = Context::new().unwrap();
+    let printer = match Printer::with_context(&context, PrinterModel::ZKTeco.profile()) {
+        Ok(maybe_printer) => match maybe_printer {
+            Some(printer) => printer,
+            None => panic!("No printer was found :(")
+        },
+        Err(e) => panic!("Error: {}", e)
+    };
+    match printer.raw(b"Hello, world!\n") {
+        Ok(_) => (),
+        Err(e) => println!("Error: {}", e)
+    }
+
+    match printer.raw(Command::Cut.as_bytes()) {
+        Ok(_) => (),
+        Err(e) => println!("Error: {}", e)
+    }
+}
+```
+
+You can take a look at the `Command` enum to see which commands are implemented (the list will grow).
+
+## Printing images
+
+You can also send images to the printer (assuming it is supported) through the `EscposImage` structure.
+
+```rust
+use libusb::{Context};
+use escpos_rs::{
+    EscposImage, Printer, PrinterProfile, Justification
+};
+
+fn main() {
+    let context = Context::new().unwrap();
+    let mut printer_profile = PrinterProfile::builder(0x0001, 0x0001).build();
+    let printer = match Printer::with_context(&context, printer_profile) {
+        Ok(maybe_printer) => match maybe_printer {
+            Some(printer) => printer,
+            None => panic!("No printer was found :(")
+        },
+        Err(e) => panic!("Error: {}", e)
+    };
+    let img = image::open("logo.jpg");
+    let escpos_image = EscposImage::new(img, 128, Justification::Center).unwrap();
+    match printer.image(escpos_image) {
+        Ok(_) => (), // Image should be printed
+        Err(e) => println!("Error: {}", e)
+    };
+}
+```
+
+The `EscposImage`'s constructor takes as first argument a `DynamicImage`, as second a width scale (from 0 to 255), and as third, a justification.
 
 ## Network functionality
 
@@ -65,18 +127,18 @@ To be added soon.
 The Instruction structure has as primary goal the construction of a __template__, which can be used to print multiple documents with dynamic data.
 
 ```rust
-use escpos_rs::{Printer, PrintData, PrinterDetails, Instruction, Justification, command::Font};
+use escpos_rs::{Printer, PrintData, PrinterProfile, Instruction, Justification, command::Font};
 use libusb::{Context};
 
 fn main() {
     // We create a usb contest for the printer
     let context = Context::new().unwrap();
-    // Printer details...
-    let printer_details = PrinterDetails::builder(0x0001, 0x0001)
+    // Printer profile...
+    let printer_profile = PrinterProfile::builder(0x0001, 0x0001)
         .with_font_width(Font::FontA, 32)
         .build();
     // We pass it to the printer
-    let printer = match Printer::with_context(&context, printer_details) {
+    let printer = match Printer::with_context(&context, printer_profile) {
         Ok(maybe_printer) => match maybe_printer {
             Some(printer) => printer,
             None => panic!("No printer was found :(")

@@ -12,6 +12,8 @@ pub struct PrinterProfile {
     pub (crate) product_id: u16,
     /// Paper width, in characters, for the printer
     pub (crate) columns_per_font: HashMap<Font, u8>,
+    /// Total printer width in pixels, for image printing
+    pub (crate) width: u16,
     /// Endpoint where the usb data is meant to be written to
     pub (crate) endpoint: Option<u8>,
     /// Timeout for bulk write operations
@@ -22,11 +24,12 @@ impl PrinterProfile {
     /// Create custom printing details
     ///
     /// Not recommended to use, as it contains a lot of arguments. See the [builder](PrinterProfile::builder) function instead.
-    pub fn new(vendor_id: u16, product_id: u16, columns_per_font: HashMap<Font, u8>, endpoint: Option<u8>, timeout: std::time::Duration) -> PrinterProfile {
+    pub fn new(vendor_id: u16, product_id: u16, columns_per_font: HashMap<Font, u8>, width: u16, endpoint: Option<u8>, timeout: std::time::Duration) -> PrinterProfile {
         PrinterProfile {
             vendor_id,
             product_id,
             columns_per_font,
+            width,
             endpoint,
             timeout
         }
@@ -51,6 +54,7 @@ pub struct PrinterProfileBuilder {
     vendor_id: u16,
     product_id: u16,
     columns_per_font: HashMap<Font, u8>,
+    width: u16,
     endpoint: Option<u8>,
     timeout: std::time::Duration
 }
@@ -69,6 +73,7 @@ impl PrinterProfileBuilder {
             vendor_id,
             product_id,
             columns_per_font: HashMap::new(),
+            width: 384,
             endpoint: None,
             timeout: std::time::Duration::from_secs(2)
         }
@@ -84,6 +89,19 @@ impl PrinterProfileBuilder {
     /// ```
     pub fn with_endpoint(mut self, endpoint: u8) -> PrinterProfileBuilder {
         self.endpoint = Some(endpoint);
+        self
+    }
+
+    /// Adds a specific pixel width for the printer (required for printing images)
+    ///
+    /// Defaults to 384, usually for 58mm printers.
+    /// ```rust
+    /// let printer_profile = PrinterProfileBuilder::new(0x0001, 0x0001)
+    ///     .with_width(384)
+    ///     .build();
+    /// ```
+    pub fn with_width(mut self, width: u16) -> PrinterProfileBuilder {
+        self.width = width;
         self
     }
 
@@ -123,6 +141,7 @@ impl PrinterProfileBuilder {
             vendor_id: self.vendor_id,
             product_id: self.product_id,
             columns_per_font: self.columns_per_font,
+            width: self.width,
             endpoint: self.endpoint,
             timeout: self.timeout
         }

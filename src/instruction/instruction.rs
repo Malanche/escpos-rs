@@ -155,11 +155,7 @@ impl Instruction {
 
     /// Sends simple text to the printer.
     ///
-    /// The markdown flag allows for markdown text interpretation, which understands a little subset of Markdown, mainly:
-    ///
-    ///  * Bold font, with **
-    ///  * Italics, with _
-    ///  * Strike
+    /// Straightfoward text printing. The `replacements` set specifies which contents of the string should be replaced in a per-impresion basis.
     pub fn text<A: Into<String>>(content: A, font: Font, justification: Justification, replacements: Option<HashSet<String>>) -> Instruction {
         Instruction::Text {
             content: content.into(),
@@ -192,7 +188,11 @@ impl Instruction {
     ///
     /// For a more precise control of position in the image, it is easier to edit the input image beforehand.
     pub fn image(source: Vec<u8>, scale: u8, justification: Justification) -> Result<Instruction, Error> {
-        let img = EscposImage::new(source, scale, justification)?;
+        let content = match image::load_from_memory(&source) {
+            Ok(i) => i,
+            Err(e) => return Err(Error::ImageError(e))
+        };
+        let img = EscposImage::new(content, scale, justification)?;
         Ok(Instruction::Image {
             image: img
         })
@@ -275,7 +275,7 @@ impl Instruction {
                 target.append(&mut vec![b'\n'; *lines as usize])
             },
             Instruction::Image{image} => {
-                target.extend_from_slice(&image.feed);
+                target.extend_from_slice(&image.feed(printer_profile.width));
             },
             Instruction::QRCode{name} => {
                 if let Some(qr_contents) = &print_data.qr_contents {

@@ -29,6 +29,7 @@ impl PrinterModel {
                     vendor_id,
                     product_id,
                     columns_per_font: vec![(Font::FontA, 32)].into_iter().collect(),
+                    width: 384,
                     endpoint: Some(0x02),
                     timeout: std::time::Duration::from_secs(2)
                 }
@@ -38,6 +39,7 @@ impl PrinterModel {
                     vendor_id,
                     product_id,
                     columns_per_font: vec![(Font::FontA, 48)].into_iter().collect(),
+                    width: 576,
                     endpoint: Some(0x01),
                     timeout: std::time::Duration::from_secs(2)
                 }

@@ -1,19 +1,17 @@
 use crate::{
     Instruction,
     PrintData,
+    EscposImage,
     Error,
     command::Command
 };
 
 extern crate libusb;
-extern crate image;
 extern crate codepage_437;
 extern crate log;
 
 use log::{warn};
-use image::{GenericImageView, Pixel};
 use libusb::{Context, DeviceHandle};
-use std::path::Path;
 use codepage_437::{IntoCp437, CP437_CONTROL};
 use super::{PrinterProfile, PrinterModel};
 
@@ -28,7 +26,7 @@ use super::{PrinterProfile, PrinterModel};
 ///     // We create a usb contest for the printer
 ///     let context = Context::new().unwrap();
 ///     // We pass it to the printer
-///     let printer = match Printer::with_context(&context, PrinterModel::TMT20.details()) {
+///     let printer = match Printer::with_context(&context, PrinterModel::TMT20.profile()) {
 ///         Ok(maybe_printer) => match maybe_printer {
 ///             Some(printer) => printer,
 ///             None => panic!("No printer was found :(")
@@ -191,69 +189,8 @@ impl<'a> Printer<'a> {
         self.raw(&feed)
     }
 
-    pub fn image<T: AsRef<Path>>(&self, path: T) -> Result<(), Error> {
-        let mut feed = Vec::new();
-        feed.extend_from_slice(&Command::NoLine.as_bytes());
-        // Each row will contain the information of 8 rows from the picture
-        let mut printer_rows: Vec<[u8; 384]> = Vec::new();
-
-        let img = match image::open(path.as_ref()) {
-            Ok(v) => v,
-            Err(e) => return Err(Error::ImageError(e))
-        };
-        let (width, height) = img.dimensions();
-        let aspect_ratio = (width as f64)/(height as f64);
-        // El *3 es por la baja densidad de impresión horizontal (1 byte en lugar de 3)
-        let new_height = (384.0/(aspect_ratio*3.0)).floor() as u32;
-        let b = image::imageops::resize(&img, 384, new_height, image::imageops::FilterType::Nearest);
-        for (y, pixel_row) in b.enumerate_rows() {
-            if y%8 == 0 {
-                printer_rows.push([0; 384]);
-            }
-            let row = printer_rows.get_mut((y/8) as usize).unwrap();
-            for (x, y, pixel) in pixel_row {
-                let ps = pixel.channels();
-                let mut color = if ps.len() == 3 {
-                    let grayscale = 0.2126*(ps[0] as f64) + 0.7152*(ps[1] as f64) + 0.0722*(ps[2] as f64);
-                    if grayscale < 78.0 {
-                        0x01
-                    } else {
-                        0x00
-                    }
-                } else {
-                    if ps[3] > 64 {
-                        let grayscale = 0.2126*(ps[0] as f64) + 0.7152*(ps[1] as f64) + 0.0722*(ps[2] as f64);
-                        if grayscale < 78.0 {
-                            0x01
-                        } else {
-                            0x00
-                        }
-                    } else {
-                        // It is transparent, so no color
-                        0x00
-                    }
-                };
-                color = color << (7 - y%8);
-                row[x as usize] = row[x as usize] | color;
-            }
-        }
-
-        println!("Should print {} printer rows", printer_rows.len());
-
-        for printer_row in printer_rows {
-            // We first, declare a bitmap mode
-            feed.extend_from_slice(&Command::Bitmap.as_bytes());
-            // Now, we pass m
-            let m = 0x01;
-            feed.push(m);
-            // The formula on how many pixels we will do, is nL + nH * 256
-            feed.push(0x80);
-            feed.push(0x01);
-            feed.extend_from_slice(&printer_row);
-        }
-        feed.extend_from_slice(&Command::ResetLine.as_bytes());
-        feed.extend_from_slice(&Command::Reset.as_bytes());
-        self.raw(&feed)
+    pub fn image(&self, escpos_image: EscposImage) -> Result<(), Error> {
+        self.raw(&escpos_image.feed(self.printer_profile.width))
     }
 
     /// Sends raw information to the printer
@@ -263,10 +200,10 @@ impl<'a> Printer<'a> {
     /// let bytes = vec![0x01, 0x02];
     /// printer.raw(bytes)
     /// ```
-    pub fn raw(&self, bytes: &Vec<u8>) -> Result<(), Error> {
+    pub fn raw<A: AsRef<[u8]>>(&self, bytes: A) -> Result<(), Error> {
         self.dh.write_bulk(
             self.endpoint,
-            bytes,
+            bytes.as_ref(),
             self.printer_profile.timeout
         ).map_err(|e| Error::LibusbError(e))?;
         Ok(())

@@ -1,16 +1,17 @@
 //! Library for controlling esc/pos printers with rust
 //!
-//! For printing, a libusb [Context](https://docs.rs/libusb/0.3.0/libusb/struct.Context.html) is required.
+//! Not ready for production (yet, but soon!). For printing, a libusb [Context](https://docs.rs/libusb/0.3.0/libusb/struct.Context.html) is required.
 //!
 //! ```rust
-//! use escpos_rs::{Printer};
+//! use escpos_rs::{Printer, PrinterProfile};
 //! use libusb::{Context};
 //!
 //! fn main() {
 //!     // We create a usb contest for the printer
 //!     let context = Context::new().unwrap();
+//!     let printer_profile = PrinterProfile::builder(0x0001, 0x0001).build();
 //!     // We pass it to the printer
-//!     let printer = match Printer::with_context(&context, PrinterModel::TMT20.details()) {
+//!     let printer = match Printer::with_context(&context, printer_profile) {
 //!         Ok(maybe_printer) => match maybe_printer {
 //!             Some(printer) => printer,
 //!             None => panic!("No printer was found :(")
@@ -50,11 +51,11 @@
 //!     // We create a usb contest for the printer
 //!     let context = Context::new().unwrap();
 //!     // Printer details...
-//!     let printer_details = PrinterProfile::builder(0x0001, 0x0001)
+//!     let printer_profile = PrinterProfile::builder(0x0001, 0x0001)
 //!         .with_font_width(Font::FontA, 32)
 //!         .build();
 //!     // We pass it to the printer
-//!     let printer = match Printer::with_context(&context, printer_details) {
+//!     let printer = match Printer::with_context(&context, printer_profile) {
 //!         Ok(maybe_printer) => match maybe_printer {
 //!             Some(printer) => printer,
 //!             None => panic!("No printer was found :(")
@@ -92,7 +93,7 @@
 //! ```
 
 pub use printer::{Printer, PrinterProfile, PrinterProfileBuilder, PrinterModel};
-pub use instruction::{Instruction, Justification, PrintData, PrintDataBuilder};
+pub use instruction::{Instruction, Justification, PrintData, PrintDataBuilder, EscposImage};
 pub use error::{Error};
 
 /// Contains raw esc/pos commands
