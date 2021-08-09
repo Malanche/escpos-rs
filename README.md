@@ -107,7 +107,7 @@ fn main() {
         },
         Err(e) => panic!("Error: {}", e)
     };
-    let img = image::open("logo.jpg");
+    let img = image::open("logo.jpg").unwrap();
     let escpos_image = EscposImage::new(img, 128, Justification::Center).unwrap();
     match printer.image(escpos_image) {
         Ok(_) => (), // Image should be printed
