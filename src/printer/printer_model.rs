@@ -28,7 +28,7 @@ impl PrinterModel {
                 PrinterProfile {
                     vendor_id,
                     product_id,
-                    columns_per_font: vec![(Font::FontA, 32)].into_iter().collect(),
+                    columns_per_font: vec![(Font::FontA, 32), (Font::FontB, 42)].into_iter().collect(),
                     width: 384,
                     endpoint: Some(0x02),
                     timeout: std::time::Duration::from_secs(2)
