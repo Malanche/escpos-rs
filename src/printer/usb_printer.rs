@@ -142,11 +142,11 @@ impl<'a> Printer<'a> {
     /// Print an instruction
     ///
     /// You can pass optional printer data to the printer to fill in the dynamic parts of the instruction.
-    pub fn instruction(&self, instruction: &Instruction, print_data: &PrintData) -> Result<(), Error> {
+    pub fn instruction(&self, instruction: &Instruction, print_data: Option<&PrintData>) -> Result<(), Error> {
         let content = instruction.to_vec(&self.printer_profile, print_data).unwrap();
         self.raw(&content)
     }
-
+    
     /// Print some text. By default, there is line skipping with spaces as newlines (when the text does not fit). At the end, no newline is added.
     pub fn print<T: AsRef<str>>(&self, content: T) -> Result<(), Error> {
         let feed = String::from(content.as_ref()).into_cp437(&CP437_CONTROL).map_err(|e| Error::CP437Error(e.into_string()))?;

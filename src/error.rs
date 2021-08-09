@@ -11,6 +11,8 @@ pub enum Error {
     NoBulkEndpoint,
     /// No replacement string for an instruction was found
     NoReplacementFound(String),
+    /// PrintData should've been supplied.
+    NoPrintData,
     PrinterError(String),
     WrongMarkdown,
     NoTables,
@@ -29,6 +31,7 @@ impl std::fmt::Display for Error {
             Error::ImageError(e) => format!("Image error: {}", e),
             Error::NoBulkEndpoint => format!("No bulk endpoint could be found"),
             Error::NoReplacementFound(replacement) => format!("Could not find replacement for tag {{{}}}", replacement),
+            Error::NoPrintData => format!("Print data must be supplied for this instruction"),
             Error::PrinterError(detail) => format!("An error occured while printing, {}", detail),
             Error::WrongMarkdown => format!("Incorrect markdown structure"),
             Error::NoTables => format!("Not a single table was found in the PrintData structure"),

@@ -175,7 +175,7 @@ fn main() {
 }
 ```
 
-Instructions can be added up to form a complex instruction.
+Instructions can be added up to form a complex instruction. Moreover, you can use [serde](https://docs.rs/serde) to serialize and deserialize these instructions so you can save your templates.
 
 # About building this library on Windows
 

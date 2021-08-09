@@ -64,7 +64,10 @@ impl EscposImage {
         // We have to create a new cropped image
         dynamic_image = DynamicImage::ImageRgba8(image::imageops::crop(&mut back, 0, 0, im_width, sc_height).to_image());
 
-        let source = base64::encode(&dynamic_image.as_bytes());
+        let mut encoded = Vec::new();
+        dynamic_image.write_to(&mut encoded, image::ImageFormat::Png).map_err(|e| Error::ImageError(e))?;
+
+        let source = base64::encode(&encoded);
         
         Ok(EscposImage {
             source,
@@ -157,6 +160,7 @@ impl EscposImage {
     /// Useful method to decrease the number of operations done per printing, by skipping the scaling step for a specific printer.
     pub fn cache_for(&mut self, width: u16) {
         self.cache.insert(width, self.build_scaled(width));
+        self.cached_widths.insert(width);
     }
 
     pub fn feed(&self, width: u16) -> Vec<u8> {
@@ -174,9 +178,6 @@ impl EscposImage {
 impl Serialize for EscposImage {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer {
-        //Err(e) => Err(serde::ser::Error::custom(format!("could not cast x509 into pem bytes, {}", e)))
-        //serializer.serialize_str(&self.source)
-
         let mut tup = serializer.serialize_tuple(2)?;
         tup.serialize_element(&self.source)?;
         tup.serialize_element(&self.cached_widths)?;
@@ -202,7 +203,7 @@ impl<'de> serde::de::Visitor<'de> for EscposImageVisitor {
         };
         let dynamic_image = image::load_from_memory(&content).map_err(|_| serde::de::Error::custom("first element of tuple not an image"))?;
         // We will serialize it already
-        let mut escpos_image = EscposImage::new(dynamic_image, 1, Justification::Left).map_err(|_| serde::de::Error::custom("failed to create the image"))?;
+        let mut escpos_image = EscposImage::new(dynamic_image, 255, Justification::Left).map_err(|e| serde::de::Error::custom(format!("failed to create the image, {}", e)))?;
         let cached_widths: HashSet<u16> = seq.next_element()?.ok_or(serde::de::Error::custom("second element of tuple missing"))?;
 
         for width in cached_widths {

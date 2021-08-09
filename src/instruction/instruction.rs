@@ -187,14 +187,9 @@ impl Instruction {
     /// * The scale value stands as scale / 255
     ///
     /// For a more precise control of position in the image, it is easier to edit the input image beforehand.
-    pub fn image(source: Vec<u8>, scale: u8, justification: Justification) -> Result<Instruction, Error> {
-        let content = match image::load_from_memory(&source) {
-            Ok(i) => i,
-            Err(e) => return Err(Error::ImageError(e))
-        };
-        let img = EscposImage::new(content, scale, justification)?;
+    pub fn image(image: EscposImage) -> Result<Instruction, Error> {
         Ok(Instruction::Image {
-            image: img
+            image: image
         })
     }
 
@@ -204,10 +199,13 @@ impl Instruction {
         // Render the bits into an image.
         let img = code.render::<image::Rgba<u8>>().build();
 
-        let mut content = Vec::new();
-        image::DynamicImage::ImageRgba8(img).write_to(&mut content, image::ImageOutputFormat::Png).unwrap();
+        let escpos_image = EscposImage::new(
+            image::DynamicImage::ImageRgba8(img),//.write_to(&mut content, image::ImageOutputFormat::Png).unwrap();
+            128,
+            Justification::Center
+        )?;
         
-        Instruction::image(content, 128, Justification::Center)
+        Instruction::image(escpos_image)
     }
 
     /// Creates a dynamic qr code instruction, which requires a string at printing time
@@ -257,7 +255,7 @@ impl Instruction {
     }
 
     /// Main serialization function
-    pub(crate) fn to_vec(&self, printer_profile: &PrinterProfile, print_data: &PrintData) -> Result<Vec<u8>, Error> {
+    pub(crate) fn to_vec(&self, printer_profile: &PrinterProfile, print_data: Option<&PrintData>) -> Result<Vec<u8>, Error> {
         let mut target = Vec::new();
         match self {
             Instruction::Compound{instructions} => {
@@ -278,9 +276,10 @@ impl Instruction {
                 target.extend_from_slice(&image.feed(printer_profile.width));
             },
             Instruction::QRCode{name} => {
+                let print_data = print_data.ok_or(Error::NoPrintData)?;
                 if let Some(qr_contents) = &print_data.qr_contents {
                     if let Some(qr_content) = qr_contents.get(name) {
-                        target.extend_from_slice(&Instruction::qr_code(qr_content.clone())?.to_vec(printer_profile, print_data)?)
+                        target.extend_from_slice(&Instruction::qr_code(qr_content.clone())?.to_vec(printer_profile, Some(print_data))?)
                     } else {
                         return Err(Error::NoQrContent(name.clone()))
                     }
@@ -302,11 +301,15 @@ impl Instruction {
                 let mut replaced_string = content.clone();
                 // First of all, we replace all the replacements
                 if let Some(self_replacements) = &self_replacements {
-                    for key in self_replacements.iter() {
-                        if let Some(replacement) = print_data.replacements.get(key) {
-                            replaced_string = replaced_string.as_str().replace(key, replacement);
-                        } else {
-                            return Err(Error::NoReplacementFound(key.clone()))
+                    if self_replacements.len() != 0 {
+                        let print_data = print_data.ok_or(Error::NoPrintData)?;
+
+                        for key in self_replacements.iter() {
+                            if let Some(replacement) = print_data.replacements.get(key) {
+                                replaced_string = replaced_string.as_str().replace(key, replacement);
+                            } else {
+                                return Err(Error::NoReplacementFound(key.clone()))
+                            }
                         }
                     }
                 }
@@ -377,6 +380,8 @@ impl Instruction {
                 target.push(b'\n');
                 
                 // Now we actually look up the table
+                let print_data = print_data.ok_or(Error::NoPrintData)?;
+
                 if let Some(tables) = &print_data.duo_tables {
                     if let Some(table) = tables.get(name) {
                         for row in table {
@@ -391,9 +396,12 @@ impl Instruction {
             },
             Instruction::TrioTable{name, header} => {
                 // First, we will determine the proper alignment for the middle component
+                let print_data = print_data.ok_or(Error::NoPrintData)?;
+
                 let mut max_left: usize = header.0.len();
                 let mut max_middle: usize = header.1.len();
                 let mut max_right: usize = header.2.len();
+
                 if let Some(tables) = &print_data.trio_tables {
                     if let Some(table) = tables.get(name) {
                         for row in table {
@@ -466,6 +474,8 @@ impl Instruction {
             },
             Instruction::QuadTable{name, header} => {
                 // First, we will determine the proper alignment for the middle component
+                let print_data = print_data.ok_or(Error::NoPrintData)?;
+
                 let mut max_left: usize = header.0.len();
                 let mut max_middle: usize = header.1.len();
                 let mut max_right: usize = header.2.len();
