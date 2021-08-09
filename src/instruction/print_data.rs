@@ -40,9 +40,10 @@ impl PrintDataBuilder {
     /// Replacement strings are a simple pattern matching replacement, where all matching instances of `target` get replaces by `replacement`
     ///
     /// ```rust
+    /// # use escpos_rs::PrintDataBuilder;
     /// let print_data = PrintDataBuilder::new()
     ///     // Instances of "%name%" will get replaced with "Carlos"
-    ///     .add_replacement("%name%", "Carlos")
+    ///     .replacement("%name%", "Carlos")
     ///     .build();
     /// ```
     ///
