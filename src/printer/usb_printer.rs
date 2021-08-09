@@ -18,8 +18,8 @@ use super::{PrinterProfile, PrinterModel};
 /// Main escpos-rs structure
 ///
 /// The printer represents the thermal printer connected to the computer.
-/// ```rust
-/// use escpos_rs::{Printer};
+/// ```rust,no_run
+/// use escpos_rs::{Printer, PrinterModel};
 /// use libusb::{Context};
 ///
 /// fn main() {
@@ -143,7 +143,7 @@ impl<'a> Printer<'a> {
     ///
     /// You can pass optional printer data to the printer to fill in the dynamic parts of the instruction.
     pub fn instruction(&self, instruction: &Instruction, print_data: Option<&PrintData>) -> Result<(), Error> {
-        let content = instruction.to_vec(&self.printer_profile, print_data).unwrap();
+        let content = instruction.to_vec(&self.printer_profile, print_data)?;
         self.raw(&content)
     }
     
@@ -196,9 +196,14 @@ impl<'a> Printer<'a> {
     /// Sends raw information to the printer
     ///
     /// As simple as it sounds
-    /// ```rust
-    /// let bytes = vec![0x01, 0x02];
-    /// printer.raw(bytes)
+    /// ```rust,no_run
+    /// # use libusb::Context;
+    /// # use escpos_rs::{Printer,PrinterProfile};
+    /// # let context = Context::new().unwrap();
+    /// # let printer_profile = PrinterProfile::builder(0x0001, 0x0001).build();
+    /// # let printer = Printer::with_context(&context, printer_profile).unwrap().unwrap();
+    /// printer.raw(&[0x01, 0x02])?;
+    /// # Ok::<(), escpos_rs::Error>(())
     /// ```
     pub fn raw<A: AsRef<[u8]>>(&self, bytes: A) -> Result<(), Error> {
         self.dh.write_bulk(

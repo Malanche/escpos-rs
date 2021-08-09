@@ -39,8 +39,9 @@ impl PrinterProfile {
     ///
     /// Equivalent to a call to [PrinterProfileBuilder](crate::PrinterProfileBuilder)'s [new](crate::PrinterProfileBuilder::new) function.
     /// ```rust
+    /// # use escpos_rs::PrinterProfile;
     /// // Creates a minimum data structure to connect to a printer
-    /// let printer_profile = PrinterProfile::builder().build();
+    /// let printer_profile = PrinterProfile::builder(0x0001, 0x0001).build();
     /// ```
     pub fn builder(vendor_id: u16, product_id: u16) -> PrinterProfileBuilder {
         PrinterProfileBuilder::new(vendor_id, product_id)
@@ -63,6 +64,7 @@ impl PrinterProfileBuilder {
     /// Creates a new [PrinterProfileBuilder](crate::PrinterProfileBuilder)
     ///
     /// ```rust
+    /// # use escpos_rs::PrinterProfileBuilder;
     /// // Creates a minimum (probably non-working) data structure to connect to a printer
     /// let printer_profile = PrinterProfileBuilder::new(0x0001, 0x0001).build();
     /// ```
@@ -82,6 +84,7 @@ impl PrinterProfileBuilder {
     /// Sets the usb endpoint to which the data will be written.
     ///
     /// ```rust
+    /// # use escpos_rs::PrinterProfileBuilder;
     /// // Creates the printer details with the endpoint 0x02
     /// let printer_profile = PrinterProfileBuilder::new(0x0001, 0x0001)
     ///     .with_endpoint(0x02)
@@ -96,6 +99,7 @@ impl PrinterProfileBuilder {
     ///
     /// Defaults to 384, usually for 58mm printers.
     /// ```rust
+    /// # use escpos_rs::PrinterProfileBuilder;
     /// let printer_profile = PrinterProfileBuilder::new(0x0001, 0x0001)
     ///     .with_width(384)
     ///     .build();
@@ -109,6 +113,7 @@ impl PrinterProfileBuilder {
     ///
     /// This allows the justification, and proper word splitting to work. If you feel insecure about what value to use, the default font (FontA) usually has 32 characters of width for 58mm paper printers, and 48 for 80mm paper. You can also look for the specsheet, or do trial and error.
     /// ```rust
+    /// # use escpos_rs::{PrinterProfileBuilder, command::Font};
     /// let printer_profile = PrinterProfileBuilder::new(0x0001, 0x0001)
     ///     .with_font_width(Font::FontA, 32)
     ///     .build();
@@ -122,6 +127,7 @@ impl PrinterProfileBuilder {
     ///
     /// USB devices might fail to write to the bulk endpoint. In such a case, a timeout must be provided to know when to stop waiting for the buffer to flush to the printer. The default value is 2 seconds.
     /// ```rust
+    /// # use escpos_rs::PrinterProfileBuilder;
     /// let printer_profile = PrinterProfileBuilder::new(0x0001, 0x0001)
     ///     .with_timeout(std::time::Duration::from_secs(3))
     ///     .build();
@@ -134,6 +140,7 @@ impl PrinterProfileBuilder {
     /// Build the `PrinterProfile` that lies beneath the builder
     ///
     /// ```rust
+    /// # use escpos_rs::PrinterProfileBuilder;
     /// let printer_profile = PrinterProfileBuilder::new(0x0001, 0x0001).build();
     /// ```
     pub fn build(self) -> PrinterProfile {

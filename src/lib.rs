@@ -2,7 +2,7 @@
 //!
 //! Not ready for production (yet, but soon!). For printing, a libusb [Context](https://docs.rs/libusb/0.3.0/libusb/struct.Context.html) is required.
 //!
-//! ```rust
+//! ```rust,no_run
 //! use escpos_rs::{Printer, PrinterProfile};
 //! use libusb::{Context};
 //!
@@ -40,7 +40,7 @@
 //!
 //! Because of the usual applications for thermal printers, the [Instruction](crate::Instruction) structure has been implemented, which allows you to define a sort of __template__, that you can use to print multiple documents with __certain__ data customized for each print.
 //!
-//! ```rust
+//! ```rust,no_run
 //! use escpos_rs::{
 //!     Printer, PrintData, PrinterProfile,
 //!     Instruction, Justification, command::Font
@@ -80,12 +80,12 @@
 //!         .build();
 //!     // We send the instruction to the printer, along with the custom data
 //!     // for this particular print
-//!     match printer.instruction(&instruction, &print_data_1) {
+//!     match printer.instruction(&instruction, Some(&print_data_1)) {
 //!         Ok(_) => (), // "Hello, Carlos!" should've been printed.
 //!         Err(e) => println!("Error: {}", e)
 //!     }
 //!     // Now we print the second data
-//!     match printer.instruction(&instruction, &print_data_2) {
+//!     match printer.instruction(&instruction, Some(&print_data_2)) {
 //!         Ok(_) => (), // "Hello, John!" should've been printed.
 //!         Err(e) => println!("Error: {}", e)
 //!     }
