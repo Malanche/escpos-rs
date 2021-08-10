@@ -11,7 +11,7 @@ extern crate codepage_437;
 extern crate log;
 
 use log::{warn};
-use libusb::{Context, DeviceHandle};
+use libusb::{Context, DeviceHandle, TransferType, Direction};
 use codepage_437::{IntoCp437, CP437_CONTROL};
 use super::{PrinterProfile, PrinterModel};
 
@@ -22,19 +22,17 @@ use super::{PrinterProfile, PrinterModel};
 /// use escpos_rs::{Printer, PrinterModel};
 /// use libusb::{Context};
 ///
-/// fn main() {
-///     // We create a usb contest for the printer
-///     let context = Context::new().unwrap();
-///     // We pass it to the printer
-///     let printer = match Printer::with_context(&context, PrinterModel::TMT20.profile()) {
-///         Ok(maybe_printer) => match maybe_printer {
-///             Some(printer) => printer,
-///             None => panic!("No printer was found :(")
-///         },
-///         Err(e) => panic!("Error: {}", e)
-///     };
-///     // Now we have a printer
-/// }
+/// // We create a usb contest for the printer
+/// let context = Context::new().unwrap();
+/// // We pass it to the printer
+/// let printer = match Printer::with_context(&context, PrinterModel::TMT20.profile()) {
+///     Ok(maybe_printer) => match maybe_printer {
+///         Some(printer) => printer,
+///         None => panic!("No printer was found :(")
+///     },
+///     Err(e) => panic!("Error: {}", e)
+/// };
+/// // Now we have a printer
 /// ```
 pub struct Printer<'a> {
     printer_profile: PrinterProfile,
@@ -49,12 +47,12 @@ impl<'a> Printer<'a> {
     /// Creates the printer with the given details, from the printer details provided, and in the given USB context.
     pub fn with_context(context: &'a Context, printer_profile: PrinterProfile) -> Result<Option<Printer<'a>>, Error> {
         let (vendor_id, product_id) = (printer_profile.vendor_id, printer_profile.product_id);
-        let devices = context.devices().map_err(|e| Error::LibusbError(e))?;
+        let devices = context.devices().map_err(Error::LibusbError)?;
         for device in devices.iter() {
-            let s = device.device_descriptor().map_err(|e| Error::LibusbError(e))?;
+            let s = device.device_descriptor().map_err(Error::LibusbError)?;
             if s.vendor_id() == vendor_id && s.product_id() == product_id {
                 // Before opening the device, we must find the bulk endpoint
-                let config_descriptor = device.active_config_descriptor().map_err(|e| Error::LibusbError(e))?;
+                let config_descriptor = device.active_config_descriptor().map_err(Error::LibusbError)?;
                 let endpoint = if let Some(endpoint) = printer_profile.endpoint {
                     endpoint
                 } else {
@@ -63,12 +61,9 @@ impl<'a> Printer<'a> {
                     for interface in config_descriptor.interfaces() {
                         for descriptor in interface.descriptors() {
                             for endpoint in descriptor.endpoint_descriptors() {
-                                match (endpoint.transfer_type(), endpoint.direction()) {
-                                    (libusb::TransferType::Bulk, libusb::Direction::Out) => if detected_endpoint.is_none() {
-                                        detected_endpoint = Some(endpoint.number());
-                                    },
-                                    _ => ()
-                                };
+                                if let (TransferType::Bulk, Direction::Out) = (endpoint.transfer_type(), endpoint.direction()) {
+                                    detected_endpoint = Some(endpoint.number());   
+                                }
                             }
                         }
                     }
@@ -163,7 +158,7 @@ impl<'a> Printer<'a> {
 
     /// Jumps _n_ number of lines (to leave whitespaces). Basically `n * '\n'` passed to `print`
     pub fn jump(&self, n: u8) -> Result<(), Error> {
-        let feed = vec!['\n' as u8, n];
+        let feed = vec![b'\n', n];
         self.raw(&feed)
     }
 
@@ -180,11 +175,10 @@ impl<'a> Printer<'a> {
             let len2 = pair.1.len();
             let num_spaces = 30 - len1 - len2;
             feed.append(&mut pair.0.as_bytes().to_vec());
-            for _ in 0..num_spaces {
-                feed.push(' ' as u8);
-            }
+            // We add the missing spaces
+            feed.resize(feed.len() + num_spaces, b' ');
             feed.append(&mut pair.1.as_bytes().to_vec());
-            feed.push('\n' as u8);
+            feed.push(b'\n');
         }
         self.raw(&feed)
     }
@@ -210,7 +204,7 @@ impl<'a> Printer<'a> {
             self.endpoint,
             bytes.as_ref(),
             self.printer_profile.timeout
-        ).map_err(|e| Error::LibusbError(e))?;
+        ).map_err(Error::LibusbError)?;
         Ok(())
     }
 }

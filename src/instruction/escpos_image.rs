@@ -65,7 +65,8 @@ impl EscposImage {
         dynamic_image = DynamicImage::ImageRgba8(image::imageops::crop(&mut back, 0, 0, im_width, sc_height).to_image());
 
         let mut encoded = Vec::new();
-        dynamic_image.write_to(&mut encoded, image::ImageFormat::Png).map_err(|e| Error::ImageError(e))?;
+        // Weird clippy suggestion, the variant acts as a function in the map_err method...
+        dynamic_image.write_to(&mut encoded, image::ImageFormat::Png).map_err(Error::ImageError)?;
 
         let source = base64::encode(&encoded);
         
@@ -107,7 +108,7 @@ impl EscposImage {
             for (x, y, pixel) in pixel_row {
                 let ps = pixel.channels();
                 // We get the color as a boolean
-                let mut color = if ps.len() == 3 {
+                let mut color = if ps.len() == 3 || ps[3] > 64 {
                     let grayscale = 0.2126*(ps[0] as f64) + 0.7152*(ps[1] as f64) + 0.0722*(ps[2] as f64);
                     if grayscale < 78.0 {
                         0x01
@@ -115,22 +116,13 @@ impl EscposImage {
                         0x00
                     }
                 } else {
-                    if ps[3] > 64 {
-                        let grayscale = 0.2126*(ps[0] as f64) + 0.7152*(ps[1] as f64) + 0.0722*(ps[2] as f64);
-                        if grayscale < 78.0 {
-                            0x01
-                        } else {
-                            0x00
-                        }
-                    } else {
-                        // It is transparent, so no color
-                        0x00
-                    }
+                    // It is transparent, so no color
+                    0x00
                 };
                 // We shift the boolean by 7 - y%8 positions in the register
-                color = color << (7 - y%8);
+                color <<= 7 - y%8;
                 // An or operation preserves the previous pixels in the rows
-                row[x as usize] = row[x as usize] | color;
+                row[x as usize] |= color;
             }
         }
 
@@ -196,7 +188,7 @@ impl<'de> serde::de::Visitor<'de> for EscposImageVisitor {
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: serde::de::SeqAccess<'de> {
         let value: Option<&[u8]> = seq.next_element()?;
-        let value = value.ok_or(serde::de::Error::custom("first element of tuple missing"))?;
+        let value = value.ok_or_else(|| serde::de::Error::custom("first element of tuple missing"))?;
         let content = match base64::decode(value) {
             Ok(v) => v,
             Err(_) => return Err(serde::de::Error::custom("string is not a valid base64 sequence"))
@@ -204,7 +196,7 @@ impl<'de> serde::de::Visitor<'de> for EscposImageVisitor {
         let dynamic_image = image::load_from_memory(&content).map_err(|_| serde::de::Error::custom("first element of tuple not an image"))?;
         // We will serialize it already
         let mut escpos_image = EscposImage::new(dynamic_image, 255, Justification::Left).map_err(|e| serde::de::Error::custom(format!("failed to create the image, {}", e)))?;
-        let cached_widths: HashSet<u16> = seq.next_element()?.ok_or(serde::de::Error::custom("second element of tuple missing"))?;
+        let cached_widths: HashSet<u16> = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("second element of tuple missing"))?;
 
         for width in cached_widths {
             escpos_image.cache_for(width);

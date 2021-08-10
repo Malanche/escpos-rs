@@ -29,17 +29,17 @@ impl std::fmt::Display for Error {
             Error::LibusbError(e) => format!("Libusb error: {}", e),
             Error::CP437Error(detail) => format!("CP437 error: {}", detail),
             Error::ImageError(e) => format!("Image error: {}", e),
-            Error::NoBulkEndpoint => format!("No bulk endpoint could be found"),
+            Error::NoBulkEndpoint => "No bulk endpoint could be found".to_string(),
             Error::NoReplacementFound(replacement) => format!("Could not find replacement for tag {{{}}}", replacement),
-            Error::NoPrintData => format!("Print data must be supplied for this instruction"),
+            Error::NoPrintData => "Print data must be supplied for this instruction".to_string(),
             Error::PrinterError(detail) => format!("An error occured while printing, {}", detail),
-            Error::WrongMarkdown => format!("Incorrect markdown structure"),
-            Error::NoTables => format!("Not a single table was found in the PrintData structure"),
+            Error::WrongMarkdown => "Incorrect markdown structure".to_string(),
+            Error::NoTables => "Not a single table was found in the PrintData structure".to_string(),
             Error::NoTableFound(table) => format!("No table was found for id {{{}}}", table),
-            Error::NoWidth => format!("No width was found for the selected font"),
+            Error::NoWidth => "No width was found for the selected font".to_string(),
             Error::NoQrContent(name) => format!("Could not find qr code content for \"{}\"", name),
-            Error::NoQrContents => format!("Could not find qr contents"),
-            Error::Encoding => format!("An unsupported utf-8 character was found when passing to cp437")
+            Error::NoQrContents => "Could not find qr contents".to_string(),
+            Error::Encoding => "An unsupported utf-8 character was found when passing to cp437".to_string()
         };
         write!(formatter, "{}", content)
     }

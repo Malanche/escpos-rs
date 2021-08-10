@@ -3,6 +3,14 @@ extern crate codepage_437;
 extern crate image;
 extern crate qrcode;
 
+pub use self::print_data::{PrintData, PrintDataBuilder};
+pub use self::justification::{Justification};
+pub use self::escpos_image::EscposImage;
+
+mod print_data;
+mod justification;
+mod escpos_image;
+
 use qrcode::QrCode;
 use codepage_437::{IntoCp437, CP437_CONTROL};
 use crate::{
@@ -10,7 +18,6 @@ use crate::{
     command::{Command, Font}
 };
 use serde::{Serialize, Deserialize};
-use super::{Justification, PrintData, EscposImage};
 use std::collections::HashSet;
 
 /// Templates for recurrent prints
@@ -139,18 +146,12 @@ impl std::ops::AddAssign for Instruction {
 impl Instruction {
     /// Returns true if the instruction is compund
     pub fn is_compound(&self) -> bool {
-        match self {
-            Instruction::Compound{..} => true,
-            _ => false
-        }
+        matches!(self, Instruction::Compound{..})
     }
 
     /// Returns true if the instruction is text
     pub fn is_text(&self) -> bool {
-        match self {
-            Instruction::Text{..} => true,
-            _ => false
-        }
+        matches!(self, Instruction::Text{..})
     }
 
     /// Sends simple text to the printer.
@@ -171,7 +172,6 @@ impl Instruction {
     /// Allows markdown to be sent to the printer. Not everything is supported, so far the following list works (if the printer supports the corresponding fonts)
     ///  * Bold font, with **
     ///  * Italics, with _
-    ///  * Strike
     pub fn markdown(content: String, font: Font, justification: Justification, replacements: Option<HashSet<String>>) -> Instruction {
         Instruction::Text {
             content,
@@ -182,14 +182,12 @@ impl Instruction {
         }
     }
 
-    /// Attempts to create an image to be printed, from a byte sequence
-    ///
-    /// * The scale value stands as scale / 255
+    /// Prints an image
     ///
     /// For a more precise control of position in the image, it is easier to edit the input image beforehand.
     pub fn image(image: EscposImage) -> Result<Instruction, Error> {
         Ok(Instruction::Image {
-            image: image
+            image
         })
     }
 
@@ -221,30 +219,36 @@ impl Instruction {
     }
 
     /// Creates a table with two columns.
-    pub fn duo_table(name: String, header: (String, String), font: Font) -> Instruction {
+    pub fn duo_table<A: Into<String>, B: Into<String>, C: Into<String>>(name: A, header: (B, C), font: Font) -> Instruction {
         Instruction::DuoTable {
-            name,
-            header,
+            name: name.into(),
+            header: (header.0.into(), header.1.into()),
             font
         }
     }
 
     /// Creates a table with three columns
-    pub fn trio_table(name: String, header: (String, String, String)) -> Instruction {
+    pub fn trio_table<A: Into<String>, B: Into<String>, C: Into<String>, D: Into<String>>(name: A, header: (B, C, D)) -> Instruction {
         Instruction::TrioTable {
-            name: name,
-            header: header
+            name: name.into(),
+            header: (header.0.into(), header.1.into(), header.2.into())
         }
     }
 
-    /// Creates a table with three columns
-    pub fn quad_table(name: String, header: (String, String, String)) -> Instruction {
+    /// Creates a table with four columns
+    ///
+    /// Tables with four columns can be quite tight in 80mm printers, and unthinkable in 58mm ones or smaller. Use with caution!
+    /// ```rust,no_run
+    /// // Tables with quad values should look more like the following.
+    /// ```
+    pub fn quad_table<A: Into<String>, B: Into<String>, C: Into<String>, D: Into<String>>(name: A, header: (B, C, D)) -> Instruction {
         Instruction::QuadTable {
-            name: name,
-            header: header
+            name: name.into(),
+            header: (header.0.into(), header.1.into(), header.2.into())
         }
     }
 
+    /// Cuts the paper (if supported)
     pub fn cut() -> Instruction {
         Instruction::Cut
     }
@@ -255,6 +259,8 @@ impl Instruction {
     }
 
     /// Main serialization function
+    ///
+    /// This function turns the instruction structure into the sequence of bytes required to print the information, according to the ESCP/POS protocol. [PrintData](crate::PrintData) might be required if some of the information for printing is dynamic.
     pub(crate) fn to_vec(&self, printer_profile: &PrinterProfile, print_data: Option<&PrintData>) -> Result<Vec<u8>, Error> {
         let mut target = Vec::new();
         match self {
@@ -301,7 +307,7 @@ impl Instruction {
                 let mut replaced_string = content.clone();
                 // First of all, we replace all the replacements
                 if let Some(self_replacements) = &self_replacements {
-                    if self_replacements.len() != 0 {
+                    if !self_replacements.is_empty() {
                         let print_data = print_data.ok_or(Error::NoPrintData)?;
 
                         for key in self_replacements.iter() {
@@ -346,7 +352,7 @@ impl Instruction {
                         line = token.to_string();
                     } else {
                         width_count += token.len();
-                        if line.len() != 0 {
+                        if !line.is_empty() {
                             width_count += 1;
                             line += " ";
                         }
@@ -355,7 +361,7 @@ impl Instruction {
                 }
 
                 // Last, we deal with the last line
-                if line.len() != 0 {
+                if !line.is_empty() {
                     let mut tmp = match justification {
                         Justification::Left => format!("{}\n", line),
                         Justification::Right => format!("{:>1$}\n", line, width as usize),
@@ -431,20 +437,18 @@ impl Instruction {
                 let (max_left, max_right) = if max_left + max_middle + max_right + 2 <= width {
                     // Todo va excelentemente bien.
                     (max_left, max_right)
+                } else if max_middle + max_right + 2 <= width  && width - max_middle - max_right - 2 > 2 {
+                    // I am sorry, Mr. left side.
+                    (width - max_middle - max_right - 2, max_right)
                 } else {
-                    if max_middle + max_right + 2 <= width  && width - max_middle - max_right - 2 > 2 {
-                        // I am sorry, Mr. left side.
-                        (width - max_middle - max_right - 2, max_right)
+                    // Unluckily, we try to go for thirds
+                    let third = width / 3;
+                    if width % 3 == 0 {
+                        (third, third)
+                    } else if width % 3 == 1 {
+                        (third, third)
                     } else {
-                        // Unluckily, we try to go for thirds
-                        let third = width / 3;
-                        if width % 3 == 0 {
-                            (third, third)
-                        } else if width % 3 == 1 {
-                            (third, third)
-                        } else {
-                            (third, third)
-                        }
+                        (third, third)
                     }
                 };
 
@@ -508,20 +512,19 @@ impl Instruction {
                 let (max_left, max_right) = if max_left + max_middle + max_right + 2 <= width {
                     // Todo va excelentemente bien.
                     (max_left, max_right)
+                } else if max_middle + max_right + 2 <= width  && width - max_middle - max_right - 2 > 2 {
+                    // I am sorry, Mr. left side.
+                    (width - max_middle - max_right - 2, max_right)
                 } else {
-                    if max_middle + max_right + 2 <= width  && width - max_middle - max_right - 2 > 2 {
-                        // I am sorry, Mr. left side.
-                        (width - max_middle - max_right - 2, max_right)
+                    // Unluckily, we try to go for thirds
+                    let third = width / 3;
+                    // This spacing algorithm requires work
+                    if width % 3 == 0 {
+                        (third, third)
+                    } else if width % 3 == 1 {
+                        (third, third)
                     } else {
-                        // Unluckily, we try to go for thirds
-                        let third = width / 3;
-                        if width % 3 == 0 {
-                            (third, third)
-                        } else if width % 3 == 1 {
-                            (third, third)
-                        } else {
-                            (third, third)
-                        }
+                        (third, third)
                     }
                 };
 

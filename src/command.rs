@@ -1,7 +1,12 @@
-extern crate serde;
-
-use super::{Charset, Font, CodeTable};
 use serde::{Serialize, Deserialize};
+
+pub use self::charset::Charset;
+pub use self::font::Font;
+pub use self::code_table::CodeTable;
+
+mod charset;
+mod code_table;
+mod font;
 
 /// Common commands usefull for the printer
 #[derive(Serialize, Deserialize, Clone, Debug)]

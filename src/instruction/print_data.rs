@@ -23,9 +23,8 @@ pub struct PrintDataBuilder {
     qr_contents: Option<HashMap<String, String>>
 }
 
-impl PrintDataBuilder {
-    /// Creates a new print data builder
-    pub fn new() -> PrintDataBuilder {
+impl Default for PrintDataBuilder {
+    fn default() -> Self {
         PrintDataBuilder {
             replacements: HashMap::new(),
             duo_tables: None,
@@ -33,6 +32,13 @@ impl PrintDataBuilder {
             quad_tables: None,
             qr_contents: None
         }
+    }
+}
+
+impl PrintDataBuilder {
+    /// Creates a new print data builder
+    pub fn new() -> PrintDataBuilder {
+        PrintDataBuilder::default()
     }
 
     /// Adds a replacement string
