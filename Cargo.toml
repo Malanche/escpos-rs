@@ -1,6 +1,6 @@
 [package]
 name = "escpos-rs"
-version = "0.2.1"
+version = "0.2.2"
 license = "MIT"
 description = "Control esc/pos printers with rust"
 repository = "https://github.com/Malanche/escpos-rs.git"
