@@ -1,8 +1,8 @@
 /// Possible custom errors for the library
 #[derive(Debug)]
 pub enum Error {
-    /// Error related to libusb
-    LibusbError(libusb::Error),
+    /// Error related to rusb
+    RusbError(rusb::Error),
     /// For text printing, the replaced sequence could not be found
     CP437Error(String),
     /// Error regarding image treatment
@@ -32,7 +32,7 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         let content = match self {
-            Error::LibusbError(e) => format!("Libusb error: {}", e),
+            Error::RusbError(e) => format!("rusb error: {}", e),
             Error::CP437Error(detail) => format!("CP437 error: {}", detail),
             Error::ImageError(e) => format!("Image error: {}", e),
             Error::NoBulkEndpoint => "No bulk endpoint could be found".to_string(),

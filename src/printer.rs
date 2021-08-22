@@ -12,21 +12,20 @@ use crate::{
     command::{Command, Font}
 };
 
-extern crate libusb;
 extern crate codepage_437;
 extern crate log;
 
 use log::{warn};
-use libusb::{Context, DeviceHandle, TransferType, Direction};
+use rusb::{UsbContext, Context, DeviceHandle, TransferType, Direction};
 use codepage_437::{IntoCp437, CP437_CONTROL};
 
 /// Keeps the actual living connection to the device
-enum PrinterConnection<'a> {
+enum PrinterConnection {
     Usb {
         /// Bulk write endpoint
         endpoint: u8,
         /// Device handle
-        dh: DeviceHandle<'a>,
+        dh: DeviceHandle<Context>,
         /// Time to wait before giving up writing to the bulk endpoint
         timeout: std::time::Duration
     },
@@ -53,34 +52,35 @@ enum PrinterConnection<'a> {
 /// };
 /// // Now we have a printer
 /// ```
-pub struct Printer<'a> {
+pub struct Printer {
     printer_profile: PrinterProfile,
     /// Actual connection to the printer
-    printer_connection: PrinterConnection<'a>,
+    printer_connection: PrinterConnection,
     /// Current font and width for printing text
     font_and_width: (Font, u8)
 }
 
-impl<'a> Printer<'a> {
+impl Printer {
     /// Creates a new printer
     /// 
     /// Creates the printer with the given details, from the printer details provided, and in the given USB context.
-    pub fn new(context: &'a Context, printer_profile: PrinterProfile) -> Result<Option<Printer<'a>>, Error> {
+    pub fn new(printer_profile: PrinterProfile) -> Result<Option<Printer>, Error> {
         // Quick check for the profile containing at least one font
         match printer_profile.printer_connection_data {
             PrinterConnectionData::Usb{vendor_id, product_id, endpoint, timeout} => {
+                let context = Context::new().map_err(Error::RusbError)?;
                 let font_and_width = if let Some(width) = printer_profile.columns_per_font.get(&Font::FontA) {
                     (Font::FontA, *width)
                 } else {
                     return Err(Error::NoFontFound);
                 };
         
-                let devices = context.devices().map_err(Error::LibusbError)?;
+                let devices = context.devices().map_err(Error::RusbError)?;
                 for device in devices.iter() {
-                    let s = device.device_descriptor().map_err(Error::LibusbError)?;
+                    let s = device.device_descriptor().map_err(Error::RusbError)?;
                     if s.vendor_id() == vendor_id && s.product_id() == product_id {
                         // Before opening the device, we must find the bulk endpoint
-                        let config_descriptor = device.active_config_descriptor().map_err(Error::LibusbError)?;
+                        let config_descriptor = device.active_config_descriptor().map_err(Error::RusbError)?;
                         let actual_endpoint = if let Some(endpoint) = endpoint {
                             endpoint
                         } else {
@@ -112,7 +112,7 @@ impl<'a> Printer<'a> {
                                         // The kernel is active, we have to detach it
                                         match dh.detach_kernel_driver(0) {
                                             Ok(_) => (),
-                                            Err(e) => return Err(Error::LibusbError(e))
+                                            Err(e) => return Err(Error::RusbError(e))
                                         };
                                     }
                                 } else {
@@ -121,7 +121,7 @@ impl<'a> Printer<'a> {
                                 // Now we claim the interface
                                 match dh.claim_interface(0) {
                                     Ok(_) => (),
-                                    Err(e) => return Err(Error::LibusbError(e))
+                                    Err(e) => return Err(Error::RusbError(e))
                                 }
                                 return Ok(Some(Printer {
                                     printer_connection: PrinterConnection::Usb {
@@ -133,7 +133,7 @@ impl<'a> Printer<'a> {
                                     font_and_width
                                 }));
                             },
-                            Err(e) => return Err(Error::LibusbError(e))
+                            Err(e) => return Err(Error::RusbError(e))
                         };
                     }
                 }
@@ -148,7 +148,7 @@ impl<'a> Printer<'a> {
     /// Guesses the printer, and connects to it (not meant for production)
     ///
     /// Might help to find which printer you have if you have only one connected. The function will try to connect to a printer, based on the common ones recognized by this library.
-    pub fn with_context_feeling_lucky(context: &'a Context) -> Result<Option<Printer<'a>>, Error> {
+    pub fn with_context_feeling_lucky() -> Result<Option<Printer>, Error> {
         // Match to force update then a new model gets added, just as a reminder
         /*****
         IF YOU ARE READING THIS, AND YOU GOT AN  ERROR BECAUSE A PRINTER WAS MISSING,
@@ -161,7 +161,7 @@ impl<'a> Printer<'a> {
         // Keep up to date! All printers should appear here for the function to work
         for printer_model in vec![PrinterModel::TMT20, PrinterModel::ZKTeco] {
             let printer_profile = printer_model.usb_profile();
-            let candidate = Printer::new(context, printer_profile)?;
+            let candidate = Printer::new(printer_profile)?;
             if candidate.is_some() {
                 return Ok(candidate)
             }
@@ -289,7 +289,7 @@ impl<'a> Printer<'a> {
                     *endpoint,
                     bytes.as_ref(),
                     *timeout
-                ).map_err(Error::LibusbError)?;
+                ).map_err(Error::RusbError)?;
                 Ok(())
             },
             _other => panic!("Unimplemented")

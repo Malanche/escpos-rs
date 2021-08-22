@@ -177,6 +177,14 @@ fn main() {
 
 Instructions can be added up to form a complex instruction. Moreover, you can use [serde](https://docs.rs/serde) to serialize and deserialize these instructions so you can save your templates.
 
+## Running the examples
+
+You can run the examples contained in the examples folder, invoking them through cargo.
+
+```
+cargo run --example basic
+```
+
 # About building this library on Windows
 
 Lib usb is needed for the compilation. Go to https://github.com/libusb/libusb/releases and download the compiled binaries, and put them in your include and bin folders for mingw. You will also need a pkg config file.
