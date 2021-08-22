@@ -238,9 +238,6 @@ impl Instruction {
     /// Creates a table with four columns
     ///
     /// Tables with four columns can be quite tight in 80mm printers, and unthinkable in 58mm ones or smaller. Use with caution!
-    /// ```rust,no_run
-    /// // Tables with quad values should look more like the following.
-    /// ```
     pub fn quad_table<A: Into<String>, B: Into<String>, C: Into<String>, D: Into<String>>(name: A, header: (B, C, D)) -> Instruction {
         Instruction::QuadTable {
             name: name.into(),
