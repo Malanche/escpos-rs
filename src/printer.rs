@@ -29,6 +29,7 @@ enum PrinterConnection {
         /// Time to wait before giving up writing to the bulk endpoint
         timeout: std::time::Duration
     },
+    #[allow(dead_code)]
     Network,
     Terminal
 }
@@ -38,12 +39,8 @@ enum PrinterConnection {
 /// The printer represents the thermal printer connected to the computer.
 /// ```rust,no_run
 /// use escpos_rs::{Printer, PrinterModel};
-/// use libusb::{Context};
 ///
-/// // We create a usb contest for the printer
-/// let context = Context::new().unwrap();
-/// // We pass it to the printer
-/// let printer = match Printer::with_context(&context, PrinterModel::TMT20.profile()) {
+/// let printer = match Printer::new(PrinterModel::TMT20.usb_profile()) {
 ///     Ok(maybe_printer) => match maybe_printer {
 ///         Some(printer) => printer,
 ///         None => panic!("No printer was found :(")
@@ -65,15 +62,16 @@ impl Printer {
     /// 
     /// Creates the printer with the given details, from the printer details provided, and in the given USB context.
     pub fn new(printer_profile: PrinterProfile) -> Result<Option<Printer>, Error> {
+        // Font and width, at least one required.
+        let font_and_width = if let Some(width) = printer_profile.columns_per_font.get(&Font::FontA) {
+            (Font::FontA, *width)
+        } else {
+            return Err(Error::NoFontFound);
+        };
         // Quick check for the profile containing at least one font
         match printer_profile.printer_connection_data {
             PrinterConnectionData::Usb{vendor_id, product_id, endpoint, timeout} => {
                 let context = Context::new().map_err(Error::RusbError)?;
-                let font_and_width = if let Some(width) = printer_profile.columns_per_font.get(&Font::FontA) {
-                    (Font::FontA, *width)
-                } else {
-                    return Err(Error::NoFontFound);
-                };
         
                 let devices = context.devices().map_err(Error::RusbError)?;
                 for device in devices.iter() {
@@ -141,7 +139,7 @@ impl Printer {
                 Ok(None)
             },
             PrinterConnectionData::Network{..} => panic!("Unsupported!"),
-            PrinterConnectionData::Terminal => panic!("Unimplemented")
+            PrinterConnectionData::Terminal => Ok(Some(Printer{printer_connection: PrinterConnection::Terminal, printer_profile, font_and_width}))
         }
     }
 
@@ -274,11 +272,9 @@ impl Printer {
     ///
     /// As simple as it sounds
     /// ```rust,no_run
-    /// # use libusb::Context;
-    /// # use escpos_rs::{Printer,PrinterProfile};
-    /// # let context = Context::new().unwrap();
-    /// # let printer_profile = PrinterProfile::builder(0x0001, 0x0001).build();
-    /// # let printer = Printer::with_context(&context, printer_profile).unwrap().unwrap();
+    /// use escpos_rs::{Printer,PrinterProfile};
+    /// let printer_profile = PrinterProfile::usb_builder(0x0001, 0x0001).build();
+    /// let printer = Printer::new(printer_profile).unwrap().unwrap();
     /// printer.raw(&[0x01, 0x02])?;
     /// # Ok::<(), escpos_rs::Error>(())
     /// ```

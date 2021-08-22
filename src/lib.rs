@@ -1,16 +1,14 @@
 //! Library for controlling esc/pos printers with rust
 //!
-//! Not ready for production (yet, but soon!). For printing, a libusb [Context](https://docs.rs/libusb/0.3.0/libusb/struct.Context.html) is required.
+//! Not ready for production (yet, but soon!).
 //!
 //! ```rust,no_run
 //! use escpos_rs::{Printer, PrinterProfile};
-//! use libusb::{Context};
 //!
 //! // We create a usb contest for the printer
-//! let context = Context::new().unwrap();
-//! let printer_profile = PrinterProfile::builder(0x0001, 0x0001).build();
+//! let printer_profile = PrinterProfile::usb_builder(0x0001, 0x0001).build();
 //! // We pass it to the printer
-//! let printer = match Printer::with_context(&context, printer_profile) {
+//! let printer = match Printer::new(printer_profile) {
 //!     Ok(maybe_printer) => match maybe_printer {
 //!         Some(printer) => printer,
 //!         None => panic!("No printer was found :(")
@@ -24,9 +22,9 @@
 //! }
 //! ```
 //! 
-//! The context must be alive at least for the same time the printer will stay in scope. See the [Printer](crate::Printer) structure to see the rest of the implemented functions for interacting with the thermal printer (raw printing, images, etc.).
+//! See the [Printer](crate::Printer) structure to see the rest of the implemented functions for interacting with the thermal printer (raw printing, images, etc.).
 //!
-//! ## Printer Details
+//! ## Printer Profile
 //!
 //! In order to print, some data about the printer must be known. The [PrinterProfile](crate::PrinterProfile) structure fulfills this purpose.
 //!
@@ -43,16 +41,13 @@
 //!     Printer, PrintData, PrinterProfile,
 //!     Instruction, Justification, command::Font
 //! };
-//! use libusb::{Context};
 //! 
-//! // We create a usb contest for the printer
-//! let context = Context::new().unwrap();
 //! // Printer details...
-//! let printer_profile = PrinterProfile::builder(0x0001, 0x0001)
+//! let printer_profile = PrinterProfile::usb_builder(0x0001, 0x0001)
 //!     .with_font_width(Font::FontA, 32)
 //!     .build();
 //! // We pass it to the printer
-//! let printer = match Printer::with_context(&context, printer_profile) {
+//! let printer = match Printer::new(printer_profile) {
 //!     Ok(maybe_printer) => match maybe_printer {
 //!         Some(printer) => printer,
 //!         None => panic!("No printer was found :(")

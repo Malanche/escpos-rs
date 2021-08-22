@@ -186,7 +186,7 @@ impl PrinterProfileBuilder {
     /// ```rust
     /// use escpos_rs::PrinterProfileBuilder;
     /// let printer_profile = PrinterProfileBuilder::new_usb(0x0001, 0x0001)
-    ///     .with_timeout(std::time::Duration::from_secs(3))
+    ///     .with_timeout(std::time::Duration::from_secs(3)).unwrap()
     ///     .build();
     /// ```
     pub fn with_timeout(mut self, timeout: std::time::Duration) -> Result<PrinterProfileBuilder, Error> {

@@ -1,4 +1,4 @@
-/// Possible custom errors for the library
+/// Errors that this crate throws.
 #[derive(Debug)]
 pub enum Error {
     /// Error related to rusb

@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+/// Contains custom information for each print
+///
+/// Some instructions require custom information in order to get printed. The [PrintData](self::PrintData) structure contains such custom information. The builder pattern is used to construct this structure, see [PrintDataBuilder](self::PrintDataBuilder).
 pub struct PrintData {
     pub(crate) replacements: HashMap<String, String>,
     pub(crate) duo_tables: Option<HashMap<String, Vec<(String, String)>>>,
@@ -15,6 +18,7 @@ impl PrintData {
     }
 }
 
+/// Helps build a valid [PrintData](self::PrintData)
 pub struct PrintDataBuilder {
     replacements: HashMap<String, String>,
     duo_tables: Option<HashMap<String, Vec<(String, String)>>>,
