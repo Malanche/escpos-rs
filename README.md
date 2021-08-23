@@ -59,7 +59,7 @@ use escpos_rs::{
 };
 
 fn main() {
-    let printer = match Printer::new(PrinterModel::ZKTeco.profile()) {
+    let printer = match Printer::new(PrinterModel::ZKTeco.usb_profile()) {
         Ok(maybe_printer) => match maybe_printer {
             Some(printer) => printer,
             None => panic!("No printer was found :(")
@@ -90,7 +90,7 @@ use escpos_rs::{
 };
 
 fn main() {
-    let mut printer_profile = PrinterProfile::usb_builder(0x0001, 0x0001).build();
+    let printer_profile = PrinterProfile::usb_builder(0x0001, 0x0001).build();
     let printer = match Printer::new(printer_profile) {
         Ok(maybe_printer) => match maybe_printer {
             Some(printer) => printer,
@@ -138,7 +138,7 @@ fn main() {
         "Hello, %name%!",
         Font::FontA,
         Justification::Center,
-        /// Words that will be replaced in this specific instruction
+        // Words that will be replaced in this specific instruction
         Some(vec!["%name%".into()].into_iter().collect())
     );
     // We create custom information for the instruction
@@ -151,12 +151,12 @@ fn main() {
         .build();
     // We send the instruction to the printer, along with the custom data
     // for this particular print
-    match printer.instruction(&instruction, &print_data_1) {
+    match printer.instruction(&instruction, Some(&print_data_1)) {
         Ok(_) => (), // "Hello, Carlos!" should've been printed.
         Err(e) => println!("Error: {}", e)
     }
     // Now we print the second data
-    match printer.instruction(&instruction, &print_data_2) {
+    match printer.instruction(&instruction, Some(&print_data_2)) {
         Ok(_) => (), // "Hello, John!" should've been printed.
         Err(e) => println!("Error: {}", e)
     }

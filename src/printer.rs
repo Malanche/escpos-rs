@@ -9,7 +9,8 @@ use crate::{
     PrintData,
     EscposImage,
     Error,
-    command::{Command, Font}
+    command::{Command, Font},
+    Formatter
 };
 
 extern crate codepage_437;
@@ -54,7 +55,11 @@ pub struct Printer {
     /// Actual connection to the printer
     printer_connection: PrinterConnection,
     /// Current font and width for printing text
-    font_and_width: (Font, u8)
+    font_and_width: (Font, u8),
+    /// The auxiliary formatter to print nicely
+    formatter: Formatter,
+    /// If words should be splitted or not
+    space_split: bool
 }
 
 impl Printer {
@@ -68,6 +73,7 @@ impl Printer {
         } else {
             return Err(Error::NoFontFound);
         };
+        let formatter = Formatter::new(font_and_width.1);
         // Quick check for the profile containing at least one font
         match printer_profile.printer_connection_data {
             PrinterConnectionData::Usb{vendor_id, product_id, endpoint, timeout} => {
@@ -128,7 +134,9 @@ impl Printer {
                                         timeout
                                     },
                                     printer_profile,
-                                    font_and_width
+                                    font_and_width,
+                                    formatter,
+                                    space_split: false
                                 }));
                             },
                             Err(e) => return Err(Error::RusbError(e))
@@ -139,7 +147,13 @@ impl Printer {
                 Ok(None)
             },
             PrinterConnectionData::Network{..} => panic!("Unsupported!"),
-            PrinterConnectionData::Terminal => Ok(Some(Printer{printer_connection: PrinterConnection::Terminal, printer_profile, font_and_width}))
+            PrinterConnectionData::Terminal => Ok(Some(Printer{
+                printer_connection: PrinterConnection::Terminal,
+                printer_profile,
+                font_and_width,
+                formatter,
+                space_split: false
+            }))
         }
     }
 
@@ -178,50 +192,31 @@ impl Printer {
     
     /// Print some text.
     ///
-    /// By default, there is line skipping with spaces as newlines (when the text does not fit). At the end, no newline is added.
-    pub fn print<T: AsRef<str>>(&self, content: T) -> Result<(), Error> {
-        // First we split it into lines
-        /*
-        content.as_ref().split("\n").map(|line| {
-            // Now, for each line, we split it into words, to create
-            let mut current_line = String::new();
-            let mut lines = Vec::new();
-            for word in line.split_whitespace() {
-                let num_chars = word.chars().count();
-                if current_line.len() + num_chars + 1 < self.font_and_width.1 {
-                    current_line += &format!(" {}", word);
-                } else {
-                    if num_chars < limit {
-
-                    } else {
-                        remaining
-                    }
-                    // We have a new line
-                    current_line += "\n";
-                    lines.push(current_line.clone());
-                    current_line.clear();
-                } else {
-                    // Normal word
-                }
-                /*
-                Options:
-                1. Current chars + new word < limit (easy peasy)
-                2. Current chars + new word >= limit
-                  * new_word > limit (not easy peasy)
-                  * new_word < limit
-                */
+    /// By default, lines will break when the text exceeds the current font's width. If you want to break lines with whitespaces, according to the width, you can use the [set_space_split](Printer::set_space_split) function.
+    pub fn print<T: Into<String>>(&self, content: T) -> Result<(), Error> {
+        let content = if self.space_split {
+            self.formatter.space_split(content.into())
+        } else {
+            content.into()
+        };
+        match self.printer_connection {
+            PrinterConnection::Usb{..} => {
+                let feed = content.into_cp437(&CP437_CONTROL).map_err(|e| Error::CP437Error(e.into_string()))?;
+                self.raw(&feed)
+            },
+            PrinterConnection::Network => panic!("Unimplemented!"),
+            PrinterConnection::Terminal => {
+                print!("{}", content);
+                Ok(())
             }
-        })
-        */
-        let feed = String::from(content.as_ref()).into_cp437(&CP437_CONTROL).map_err(|e| Error::CP437Error(e.into_string()))?;
-        self.raw(&feed)
+        }
     }
 
     /// Print some text, with a newline at the end.
     ///
-    /// By default, there is line skipping with spaces as newlines (when the text does not fit, assuming a width for at least one font was provided, else the text will split exacty where the line is full). At the end, no newline is added.
-    pub fn println<T: AsRef<str>>(&self, content: T) -> Result<(), Error> {
-        let feed = String::from(content.as_ref()) + "\n";
+    /// By default, lines will break when the text exceeds the current font's width. If you want to break lines with whitespaces, according to the width, you can use the [set_space_split](Printer::set_space_split) function.
+    pub fn println<T: Into<String>>(&self, content: T) -> Result<(), Error> {
+        let feed = content.into() + "\n";
         self.print(&feed)
     }
 
@@ -237,6 +232,13 @@ impl Printer {
         }
     }
 
+    /// Enables or disables space splitting for long text printing.
+    ///
+    /// By default, the printer writes text in a single stream to the printer (which splits it wherever the maximum width is reached). To split by whitespaces, you can call this function with `true` as argument.
+    pub fn set_space_split(&mut self, state: bool) {
+        self.space_split = state;
+    }
+
     /// Jumps _n_ number of lines (to leave whitespaces). Basically `n * '\n'` passed to `print`
     pub fn jump(&self, n: u8) -> Result<(), Error> {
         let feed = vec![b'\n', n];
@@ -248,20 +250,36 @@ impl Printer {
         self.raw(&Command::Cut.as_bytes())
     }
 
-    /// Prints a table with two columns. The sum of lengths of both strings
-    pub fn table_2(&self, rows: Vec<(String, String)>) -> Result<(), Error> {
-        let mut feed = Vec::new();
-        for pair in rows {
-            let len1 = pair.0.len();
-            let len2 = pair.1.len();
-            let num_spaces = 30 - len1 - len2;
-            feed.append(&mut pair.0.as_bytes().to_vec());
-            // We add the missing spaces
-            feed.resize(feed.len() + num_spaces, b' ');
-            feed.append(&mut pair.1.as_bytes().to_vec());
-            feed.push(b'\n');
+    /// Prints a table with two columns.
+    ///
+    /// For more details, check [Formatter](crate::Formatter)'s [duo_table](crate::Formatter::duo_table).
+    pub fn duo_table<A: Into<String>, B: Into<String>, C: IntoIterator<Item = (D, E)>, D: Into<String>, E: Into<String>>(&self, headers: (A, B), rows: C) -> Result<(), Error> {
+        let content = self.formatter.duo_table(headers, rows);
+        match &self.printer_connection {
+            PrinterConnection::Terminal => {
+                println!("{}", content);
+                Ok(())
+            },
+            _other => {
+                self.raw(&content)
+            }
         }
-        self.raw(&feed)
+    }
+
+    /// Prints a table with three columns.
+    ///
+    /// For more details, check [Formatter](crate::Formatter)'s [trio_table](crate::Formatter::trio_table).
+    pub fn trio_table<A: Into<String>, B: Into<String>, C: Into<String>, D: IntoIterator<Item = (E, F, G)>, E: Into<String>, F: Into<String>, G: Into<String>>(&self, headers: (A, B, C), rows: D) -> Result<(), Error> {
+        let content = self.formatter.trio_table(headers, rows);
+        match &self.printer_connection {
+            PrinterConnection::Terminal => {
+                println!("{}", content);
+                Ok(())
+            },
+            _other => {
+                self.raw(&content)
+            }
+        }
     }
 
     pub fn image(&self, escpos_image: EscposImage) -> Result<(), Error> {

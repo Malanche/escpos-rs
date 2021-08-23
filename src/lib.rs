@@ -59,7 +59,7 @@
 //!     "Hello, %name%!",
 //!     Font::FontA,
 //!     Justification::Center,
-//!     /// Words that will be replaced in this specific instruction
+//!     // Words that will be replaced in this specific instruction
 //!     Some(vec!["%name%".into()].into_iter().collect())
 //! );
 //! // We create custom information for the instruction
@@ -88,6 +88,7 @@
 pub use printer::{Printer, PrinterProfile, PrinterProfileBuilder, PrinterModel, PrinterConnectionData};
 pub use instruction::{Instruction, Justification, PrintData, PrintDataBuilder, EscposImage};
 pub use error::{Error};
+pub use formatter::{Formatter, TableOptions};
 
 /// Contains raw esc/pos commands
 pub mod command;
@@ -95,3 +96,4 @@ pub mod command;
 mod printer;
 mod instruction;
 mod error;
+mod formatter;
