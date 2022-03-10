@@ -118,6 +118,23 @@ impl std::ops::Add<Instruction> for Instruction {
     }
 }
 
+/// From iterator operation for a vector of instructions
+impl std::iter::FromIterator<Instruction> for Option<Instruction> {
+    fn from_iter<I: IntoIterator<Item=Instruction>>(iter: I) -> Self {
+        let mut r = None;
+
+        for elem in iter {
+            if let Some(rd) = &mut r {
+                *rd += elem;
+            } else {
+                r = Some(elem);
+            }
+        }
+
+        r
+    }
+}
+
 /// Mutable addition for instructions
 impl std::ops::AddAssign for Instruction {
     fn add_assign(&mut self, other: Self) {
