@@ -93,7 +93,7 @@ impl EscposImage {
             ImageMode::TwentyfourDotDoubleDensity => 1.5
         };
 
-        /// This printers appear to have an internal scaling factor of two thirds
+        // This printers appear to have an internal scaling factor of two thirds
         let intrinsic_scaling = 2.0/3.0;
 
         let new_height = ((((printer_width as f64) * intrinsic_scaling /(aspect_ratio)).floor()) * vertical_scale) as u32;
