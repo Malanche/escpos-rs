@@ -167,11 +167,12 @@ impl Printer {
         UPDATE THE FOR FOLLOWING THE MATCH TO TRY ALL PRINTERS
         *****/
         match PrinterModel::TMT20 {
+            PrinterModel::TMT88VI => (),
             PrinterModel::TMT20 => (),
             PrinterModel::ZKTeco => ()
         }
         // Keep up to date! All printers should appear here for the function to work
-        for printer_model in vec![PrinterModel::TMT20, PrinterModel::ZKTeco] {
+        for printer_model in vec![PrinterModel::TMT20, PrinterModel::ZKTeco, PrinterModel::TMT88VI] {
             let printer_profile = printer_model.usb_profile();
             let candidate = Printer::new(printer_profile)?;
             if candidate.is_some() {
@@ -225,7 +226,9 @@ impl Printer {
     /// The function will return an error if the specified font does not exist in the printer profile.
     pub fn set_font(&mut self, font: Font) -> Result<(), Error> {
         if let Some(width) = self.printer_profile.columns_per_font.get(&font) {
+            self.raw(&Command::SelectFont{font: font.clone()}.as_bytes())?;
             self.font_and_width = (font, *width);
+            self.formatter = Formatter::new(self.font_and_width.1);
             Ok(())
         } else {
             Err(Error::UnsupportedFont)

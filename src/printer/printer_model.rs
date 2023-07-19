@@ -8,7 +8,9 @@ pub enum PrinterModel {
     /// ZKTeco mini printer
     ZKTeco,
     /// Epson most used printer
-    TMT20
+    TMT20,
+    /// Epson most used printer
+    TMT88VI
 }
 
 impl PrinterModel {
@@ -16,7 +18,8 @@ impl PrinterModel {
     pub fn vp_id(&self) -> (u16, u16, Option<u8>) {
         match self {
             PrinterModel::ZKTeco => (0x6868, 0x0200, Some(0x02)),
-            PrinterModel::TMT20 => (0x04b8, 0x0e15, Some(0x01))
+            PrinterModel::TMT20 => (0x04b8, 0x0e15, Some(0x01)),
+            PrinterModel::TMT88VI => (0x04b8, 0x0202, Some(0x01))
         }
     }
 
@@ -45,6 +48,18 @@ impl PrinterModel {
                         timeout: std::time::Duration::from_secs(2)
                     },
                     columns_per_font: vec![(Font::FontA, 48)].into_iter().collect(),
+                    width: 576
+                }
+            },
+            PrinterModel::TMT88VI => {
+                PrinterProfile {
+                    printer_connection_data: PrinterConnectionData::Usb {
+                        vendor_id,
+                        product_id,
+                        endpoint,
+                        timeout: std::time::Duration::from_secs(2)
+                    },
+                    columns_per_font: vec![(Font::FontA, 42), (Font::FontB, 56)].into_iter().collect(),
                     width: 576
                 }
             }

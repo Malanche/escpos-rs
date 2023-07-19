@@ -3,10 +3,12 @@ use serde::{Serialize, Deserialize};
 pub use self::charset::Charset;
 pub use self::font::Font;
 pub use self::code_table::CodeTable;
+pub use self::image_mode::ImageMode;
 
 mod charset;
 mod code_table;
 mod font;
+mod image_mode;
 
 /// Common commands usefull for the printer
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -36,8 +38,10 @@ pub enum Command {
     /// Equivalent to ESC * m = 0
     BoldOn,
     BoldOff,
-    /// Equivalent to ESC * m = 0
-    Bitmap,
+    /// Equivalent to ESC * m
+    Bitmap {
+        image_mode: ImageMode
+    },
     /// Change line size
     NoLine,
     ResetLine
@@ -70,7 +74,7 @@ impl Command {
             Command::Underline2Dot => vec![0x1b, 0x2d, 0x02],
             Command::BoldOn => vec![0x1b, 0x45, 0x01],
             Command::BoldOff => vec![0x1b, 0x45, 0x00],
-            Command::Bitmap => vec![0x1b, 0x2a],
+            Command::Bitmap{image_mode} => vec![0x1b, 0x2a, image_mode.as_byte()],
             Command::NoLine => vec![0x1b, 0x33, 0x00],
             Command::ResetLine => vec![0x1b, 0x32]
         }

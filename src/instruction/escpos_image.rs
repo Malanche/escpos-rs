@@ -5,7 +5,7 @@ extern crate log;
 
 use log::warn;
 use super::{Justification};
-use crate::{Error, command::{Command}};
+use crate::{Error, command::{Command, ImageMode}};
 use image::{DynamicImage, GenericImageView, Pixel};
 use serde::{Serialize, Deserialize, ser::Serializer, de::Deserializer};
 
@@ -20,8 +20,6 @@ pub struct EscposImage {
     source: String,
     /// Source image, usefull for scaling
     dynamic_image: DynamicImage,
-    ///
-    cached_widths: HashSet<u16>,
     /// Cache that holds the picture scaled for specific widths
     pub(crate) cache: HashMap<u16, Vec<u8>>
 }
@@ -30,7 +28,7 @@ impl EscposImage {
     /// Pub fn creates a new EscposImage from a [DynamicImage](https://docs.rs/image/0.23.14/image/enum.DynamicImage.html)
     ///
     /// The scale parameters goes from 0 to 255, controlling which percentage of the width should the image hold. The justification allows for a bit more specific image alignment.
-    pub fn new(mut dynamic_image: DynamicImage, scale: u8, justification: Justification) -> Result<EscposImage, Error> {
+    pub fn new(mut dynamic_image: DynamicImage, scale: u8, image_mode: ImageMode, justification: Justification) -> Result<EscposImage, Error> {
         // We extract geometrical data.
         let (im_width, im_height) = dynamic_image.dimensions();
         let aspect_ratio = (im_width as f64)/(im_height as f64);
@@ -73,7 +71,6 @@ impl EscposImage {
         Ok(EscposImage {
             source,
             dynamic_image,
-            cached_widths: HashSet::new(),
             cache: HashMap::new()
         })
     }
@@ -129,7 +126,7 @@ impl EscposImage {
         // Finally, we push each row to the feed vector
         for (_idx, printer_row) in printer_rows.iter().enumerate() {
             // We first, declare a bitmap mode
-            feed.extend_from_slice(&Command::Bitmap.as_bytes());
+            feed.extend_from_slice(&Command::Bitmap{image_mode: ImageMode::EightDotSingleDensity}.as_bytes());
             // Now, we pass m
             let m = 0x01;
             feed.push(m);
@@ -152,7 +149,6 @@ impl EscposImage {
     /// Useful method to decrease the number of operations done per printing, by skipping the scaling step for a specific printer.
     pub fn cache_for(&mut self, width: u16) {
         self.cache.insert(width, self.build_scaled(width));
-        self.cached_widths.insert(width);
     }
 
     pub fn feed(&self, width: u16) -> Vec<u8> {
@@ -170,9 +166,8 @@ impl EscposImage {
 impl Serialize for EscposImage {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer {
-        let mut tup = serializer.serialize_tuple(2)?;
+        let mut tup = serializer.serialize_tuple(1)?;
         tup.serialize_element(&self.source)?;
-        tup.serialize_element(&self.cached_widths)?;
         tup.end()
     }
 }
@@ -196,11 +191,14 @@ impl<'de> serde::de::Visitor<'de> for EscposImageVisitor {
         let dynamic_image = image::load_from_memory(&content).map_err(|_| serde::de::Error::custom("first element of tuple not an image"))?;
         // We will serialize it already
         let mut escpos_image = EscposImage::new(dynamic_image, 255, Justification::Left).map_err(|e| serde::de::Error::custom(format!("failed to create the image, {}", e)))?;
+
+        /*
         let cached_widths: HashSet<u16> = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("second element of tuple missing"))?;
 
         for width in cached_widths {
             escpos_image.cache_for(width);
         }
+        */
 
         Ok(escpos_image)
     }
