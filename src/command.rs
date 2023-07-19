@@ -38,6 +38,17 @@ pub enum Command {
     /// Equivalent to ESC * m = 0
     BoldOn,
     BoldOff,
+    /// Prints whats on the buffer, and reverses n lines
+    PrintReverse {
+        n: u8
+    },
+    PrintMode {
+        print_mode: u8
+    },
+    /// Prints in reverse mode (white over black), or disables it
+    ReverseMode {
+        active: bool
+    },
     /// Equivalent to ESC * m
     Bitmap {
         image_mode: ImageMode
@@ -74,6 +85,9 @@ impl Command {
             Command::Underline2Dot => vec![0x1b, 0x2d, 0x02],
             Command::BoldOn => vec![0x1b, 0x45, 0x01],
             Command::BoldOff => vec![0x1b, 0x45, 0x00],
+            Command::PrintReverse{n} => vec![0x1b, 0x4b, *n],
+            Command::PrintMode{print_mode} => vec![0x1b, 0x21, *print_mode],
+            Command::ReverseMode{active} => vec![0x1d, 0x42, if *active {0x01} else {0x00}],
             Command::Bitmap{image_mode} => vec![0x1b, 0x2a, image_mode.as_byte()],
             Command::NoLine => vec![0x1b, 0x33, 0x00],
             Command::ResetLine => vec![0x1b, 0x32]
