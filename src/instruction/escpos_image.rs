@@ -1,13 +1,9 @@
-extern crate serde;
-extern crate base64;
-extern crate image;
-extern crate log;
-
-use log::warn;
 use super::{Justification};
 use crate::{Error, command::{Command, ImageMode}};
 use image::{DynamicImage, GenericImageView, Pixel};
 use serde::{Serialize, Deserialize, ser::Serializer, de::Deserializer};
+
+use base64::{Engine, engine::general_purpose::STANDARD};
 
 use std::collections::{HashMap};
 use serde::ser::SerializeTuple;
@@ -66,7 +62,7 @@ impl EscposImage {
         // Weird clippy suggestion, the variant acts as a function in the map_err method...
         dynamic_image.write_to(&mut encoded, image::ImageFormat::Png).map_err(Error::ImageError)?;
 
-        let source = base64::encode(&encoded);
+        let source = STANDARD.encode(&encoded);
         
         Ok(EscposImage {
             source,
@@ -188,7 +184,7 @@ impl EscposImage {
             feed.clone()
         } else {
             // We have to create the picture... might be costly
-            warn!("Building an image on the fly in non-mutable mode. Consider caching the width.");
+            log::warn!("Building an image on the fly in non-mutable mode. Consider caching the width.");
             self.build_scaled(image_mode, width)
         }
     }
@@ -219,7 +215,7 @@ impl<'de> serde::de::Visitor<'de> for EscposImageVisitor {
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: serde::de::SeqAccess<'de> {
         let value: Option<&[u8]> = seq.next_element()?;
         let value = value.ok_or_else(|| serde::de::Error::custom("first element of tuple missing"))?;
-        let content = match base64::decode(value) {
+        let content = match STANDARD.decode(value) {
             Ok(v) => v,
             Err(_) => return Err(serde::de::Error::custom("string is not a valid base64 sequence"))
         };
