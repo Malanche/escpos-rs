@@ -93,7 +93,10 @@ impl EscposImage {
             ImageMode::TwentyfourDotDoubleDensity => 1.5
         };
 
-        let new_height = ((printer_width as f64) * vertical_scale /(aspect_ratio)).floor() as u32;
+        /// This printers appear to have an internal scaling factor of two thirds
+        let intrinsic_scaling = 2.0/3.0;
+
+        let new_height = ((((printer_width as f64) * intrinsic_scaling /(aspect_ratio)).floor()) * vertical_scale) as u32;
         
         let resized_image = image::imageops::resize(&self.dynamic_image, printer_width as u32, new_height, image::imageops::FilterType::Nearest);
 
