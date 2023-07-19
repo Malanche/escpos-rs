@@ -9,7 +9,7 @@ use crate::{Error, command::{Command, ImageMode}};
 use image::{DynamicImage, GenericImageView, Pixel};
 use serde::{Serialize, Deserialize, ser::Serializer, de::Deserializer};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use serde::ser::SerializeTuple;
 
 /// Image adapted to the printer.
@@ -21,14 +21,14 @@ pub struct EscposImage {
     /// Source image, usefull for scaling
     dynamic_image: DynamicImage,
     /// Cache that holds the picture scaled for specific widths
-    pub(crate) cache: HashMap<u16, Vec<u8>>
+    pub(crate) cache: HashMap<u16, HashMap<ImageMode, Vec<u8>>>
 }
 
 impl EscposImage {
     /// Pub fn creates a new EscposImage from a [DynamicImage](https://docs.rs/image/0.23.14/image/enum.DynamicImage.html)
     ///
     /// The scale parameters goes from 0 to 255, controlling which percentage of the width should the image hold. The justification allows for a bit more specific image alignment.
-    pub fn new(mut dynamic_image: DynamicImage, scale: u8, image_mode: ImageMode, justification: Justification) -> Result<EscposImage, Error> {
+    pub fn new(mut dynamic_image: DynamicImage, scale: u8, justification: Justification) -> Result<EscposImage, Error> {
         // We extract geometrical data.
         let (im_width, im_height) = dynamic_image.dimensions();
         let aspect_ratio = (im_width as f64)/(im_height as f64);
@@ -75,7 +75,7 @@ impl EscposImage {
         })
     }
 
-    fn build_scaled(&self, printer_width: u16) -> Vec<u8> {
+    fn build_scaled(&self, image_mode: ImageMode, printer_width: u16) -> Vec<u8> {
         let mut feed = Vec::new();
         feed.extend_from_slice(&Command::NoLine.as_bytes());
         
@@ -89,13 +89,20 @@ impl EscposImage {
         //let mut printer_rows: Vec<[u8; printer_width]> = Vec::new();
         let mut printer_rows: Vec<Vec<u8>> = Vec::new();
 
-        // El *3 es por la baja densidad de impresión vertical (1 byte en lugar de 3)
-        let new_height = ((printer_width as f64)/(aspect_ratio*3.0)).floor() as u32;
+        // El 3.0 es por la baja densidad de impresión vertical (1 byte en lugar de 3)
+        let vertical_scale = match image_mode {
+            ImageMode::EightDotSingleDensity => 1.0,
+            ImageMode::EightDotDoubleDensity => 0.5,
+            ImageMode::TwentyfourDotSingleDensity => 3.0,
+            ImageMode::TwentyfourDotDoubleDensity => 1.5
+        };
+
+        let new_height = ((printer_width as f64) * vertical_scale /(aspect_ratio)).floor() as u32;
         
-        let b = image::imageops::resize(&self.dynamic_image, printer_width as u32, new_height, image::imageops::FilterType::Nearest);
+        let resized_image = image::imageops::resize(&self.dynamic_image, printer_width as u32, new_height, image::imageops::FilterType::Nearest);
 
         // We will turn the image into a grayscale boolean matrix
-        for (y, pixel_row) in b.enumerate_rows() {
+        for (y, pixel_row) in resized_image.enumerate_rows() {
             // Here we iterate over each row of the image.
             if y%8 == 0 {
                 printer_rows.push(vec![0; printer_width as usize]);
@@ -124,20 +131,43 @@ impl EscposImage {
         }
 
         // Finally, we push each row to the feed vector
-        for (_idx, printer_row) in printer_rows.iter().enumerate() {
-            // We first, declare a bitmap mode
-            feed.extend_from_slice(&Command::Bitmap{image_mode: ImageMode::EightDotSingleDensity}.as_bytes());
-            // Now, we pass m
-            let m = 0x01;
-            feed.push(m);
-            // The formula on how many pixels we will do, is nL + nH * 256
-            feed.push((printer_width % 256) as u8); // nL
-            feed.push((printer_width / 256) as u8); // nH
-            // feed.push(0x80); // nL
-            // feed.push(0x01); // nH
-            feed.extend_from_slice(printer_row);
-            feed.push(b'\n'); // Line feed and print
+        match image_mode {
+            ImageMode::EightDotSingleDensity | ImageMode::EightDotDoubleDensity => {
+                for (_idx, printer_row) in printer_rows.iter().enumerate() {
+                    // We first, declare a bitmap mode
+                    feed.extend_from_slice(&Command::Bitmap{image_mode: image_mode.clone()}.as_bytes());
+                    // The formula on how many pixels we will do, is nL + nH * 256
+                    feed.push((printer_width % 256) as u8); // nL
+                    feed.push((printer_width / 256) as u8); // nH
+                    feed.extend_from_slice(printer_row);
+                    feed.push(b'\n'); // Line feed and print
+                }
+            },
+            ImageMode::TwentyfourDotSingleDensity | ImageMode::TwentyfourDotDoubleDensity => {
+                for counter in 0..(printer_rows.len() / 3) {
+                    let first_row = &printer_rows[3*counter + 0];
+                    let second_row = &printer_rows[3*counter + 1];
+                    let third_row = &printer_rows[3*counter + 2];
+
+                    let mut buffer = Vec::new();
+
+                    for width_idx in 0..(printer_width as usize) {
+                        buffer.push(first_row[width_idx]);
+                        buffer.push(second_row[width_idx]);
+                        buffer.push(third_row[width_idx]);
+                    }
+                    // We first, declare a bitmap mode
+                    feed.extend_from_slice(&Command::Bitmap{image_mode: image_mode.clone()}.as_bytes());
+
+                    // The formula on how many pixels we will do, is nL + nH * 256
+                    feed.push((printer_width % 256) as u8); // nL
+                    feed.push((printer_width / 256) as u8); // nH
+                    feed.extend_from_slice(&buffer);
+                    feed.push(b'\n'); // Line feed and print
+                }
+            }
         }
+
         feed.extend_from_slice(&Command::ResetLine.as_bytes());
         feed.extend_from_slice(&Command::Reset.as_bytes());
 
@@ -147,17 +177,19 @@ impl EscposImage {
     /// Creates a cached image for the specified width
     ///
     /// Useful method to decrease the number of operations done per printing, by skipping the scaling step for a specific printer.
-    pub fn cache_for(&mut self, width: u16) {
-        self.cache.insert(width, self.build_scaled(width));
+    pub fn cache_for(&mut self, image_mode: ImageMode, width: u16) {
+        let cache = self.build_scaled(image_mode.clone(), width);
+        let image_modes = self.cache.entry(width).or_insert_with(|| HashMap::new());
+        image_modes.insert(image_mode, cache);
     }
 
-    pub fn feed(&self, width: u16) -> Vec<u8> {
-        if let Some(feed) = self.cache.get(&width) {
+    pub fn feed(&self, image_mode: ImageMode, width: u16) -> Vec<u8> {
+        if let Some(feed) = self.cache.get(&width).map(|image_modes| image_modes.get(&image_mode)).flatten() {
             feed.clone()
         } else {
             // We have to create the picture... might be costly
             warn!("Building an image on the fly in non-mutable mode. Consider caching the width.");
-            self.build_scaled(width)
+            self.build_scaled(image_mode, width)
         }
     }
 }
@@ -166,8 +198,11 @@ impl EscposImage {
 impl Serialize for EscposImage {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer {
-        let mut tup = serializer.serialize_tuple(1)?;
+        let mut tup = serializer.serialize_tuple(2)?;
         tup.serialize_element(&self.source)?;
+        tup.serialize_element(&self.cache.iter().map(|(width, image_modes)| {
+            (*width, image_modes.keys().cloned().collect())
+        }).collect::<HashMap<u16, Vec<ImageMode>>>())?;
         tup.end()
     }
 }
@@ -192,13 +227,13 @@ impl<'de> serde::de::Visitor<'de> for EscposImageVisitor {
         // We will serialize it already
         let mut escpos_image = EscposImage::new(dynamic_image, 255, Justification::Left).map_err(|e| serde::de::Error::custom(format!("failed to create the image, {}", e)))?;
 
-        /*
-        let cached_widths: HashSet<u16> = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("second element of tuple missing"))?;
+        let cached_widths: HashMap<u16, Vec<ImageMode>> = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("second element of tuple missing"))?;
 
-        for width in cached_widths {
-            escpos_image.cache_for(width);
+        for (width, image_modes) in cached_widths {
+            for image_mode in image_modes {
+                escpos_image.cache_for(image_mode, width);
+            }
         }
-        */
 
         Ok(escpos_image)
     }

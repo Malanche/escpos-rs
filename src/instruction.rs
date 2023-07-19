@@ -15,7 +15,7 @@ use qrcode::QrCode;
 use codepage_437::{IntoCp437, CP437_CONTROL};
 use crate::{
     Error, PrinterProfile,
-    command::{Command, Font}
+    command::{Command, Font, ImageMode}
 };
 use serde::{Serialize, Deserialize};
 use std::collections::HashSet;
@@ -75,7 +75,9 @@ pub enum Instruction {
     /// Contains a static image, that is, does not change with different printing mechanisms
     Image {
         /// Inner image
-        image: EscposImage
+        image: EscposImage,
+        /// Resolución en la que se imprimirá
+        image_mode: ImageMode
     },
     /// Prints a QR Code. This field is dynamic
     QRCode {
@@ -202,9 +204,10 @@ impl Instruction {
     /// Prints an image
     ///
     /// For a more precise control of position in the image, it is easier to edit the input image beforehand.
-    pub fn image(image: EscposImage) -> Result<Instruction, Error> {
+    pub fn image(image: EscposImage, image_mode: ImageMode) -> Result<Instruction, Error> {
         Ok(Instruction::Image {
-            image
+            image,
+            image_mode
         })
     }
 
@@ -220,7 +223,7 @@ impl Instruction {
             Justification::Center
         )?;
         
-        Instruction::image(escpos_image)
+        Instruction::image(escpos_image, ImageMode::EightDotSingleDensity)
     }
 
     /// Creates a dynamic qr code instruction, which requires a string at printing time
@@ -292,8 +295,12 @@ impl Instruction {
             Instruction::VSpace{lines} => {
                 target.append(&mut vec![b'\n'; *lines as usize])
             },
-            Instruction::Image{image} => {
-                target.extend_from_slice(&image.feed(printer_profile.width));
+            Instruction::Image{image, image_mode} => {
+                if let Some(width) = printer_profile.width_per_image_mode.get(&image_mode) {
+                    target.extend_from_slice(&image.feed(image_mode.clone(), *width));
+                } else {
+                    return Err(Error::NoImageModeFound)
+                }
             },
             Instruction::QRCode{name} => {
                 let print_data = print_data.ok_or(Error::NoPrintData)?;

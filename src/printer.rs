@@ -9,7 +9,7 @@ use crate::{
     PrintData,
     EscposImage,
     Error,
-    command::{Command, Font},
+    command::{Command, Font, ImageMode},
     Formatter
 };
 
@@ -56,6 +56,8 @@ pub struct Printer {
     printer_connection: PrinterConnection,
     /// Current font and width for printing text
     font_and_width: (Font, u8),
+    /// Current image mode and width for printing images
+    image_mode_and_width: Option<(ImageMode, u16)>,
     /// The auxiliary formatter to print nicely
     formatter: Formatter,
     /// If words should be splitted or not
@@ -73,6 +75,10 @@ impl Printer {
         } else {
             return Err(Error::NoFontFound);
         };
+        let image_mode_and_width = printer_profile.width_per_image_mode.get(&ImageMode::EightDotSingleDensity).map(|width| {
+            (ImageMode::EightDotSingleDensity, *width)
+        });
+
         let formatter = Formatter::new(font_and_width.1);
         // Quick check for the profile containing at least one font
         match printer_profile.printer_connection_data {
@@ -135,6 +141,7 @@ impl Printer {
                                     },
                                     printer_profile,
                                     font_and_width,
+                                    image_mode_and_width,
                                     formatter,
                                     space_split: false
                                 }));
@@ -151,6 +158,7 @@ impl Printer {
                 printer_connection: PrinterConnection::Terminal,
                 printer_profile,
                 font_and_width,
+                image_mode_and_width,
                 formatter,
                 space_split: false
             }))
@@ -235,6 +243,18 @@ impl Printer {
         }
     }
 
+    /// Sets the current image mode
+    ///
+    /// The function will return an error if the specified image mode does not exist in the printer profile.
+    pub fn set_image_mode(&mut self, image_mode: ImageMode) -> Result<(), Error> {
+        if let Some(width) = self.printer_profile.width_per_image_mode.get(&image_mode) {
+            self.image_mode_and_width = Some((image_mode, *width));
+            Ok(())
+        } else {
+            Err(Error::UnsupportedFont)
+        }
+    }
+
     /// Enables or disables space splitting for long text printing.
     ///
     /// By default, the printer writes text in a single stream to the printer (which splits it wherever the maximum width is reached). To split by whitespaces, you can call this function with `true` as argument.
@@ -286,7 +306,11 @@ impl Printer {
     }
 
     pub fn image(&self, escpos_image: EscposImage) -> Result<(), Error> {
-        self.raw(&escpos_image.feed(self.printer_profile.width))
+        if let Some((image_mode, width)) = &self.image_mode_and_width {
+            self.raw(&escpos_image.feed(image_mode.clone(), *width))
+        } else {
+            Err(Error::NoImageModeFound)
+        }
     }
 
     /// Sends raw information to the printer

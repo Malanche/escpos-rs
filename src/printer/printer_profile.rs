@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::{
     Error,
-    command::Font
+    command::{Font, ImageMode}
 };
 
 /// Available connections with the printer
@@ -38,19 +38,19 @@ pub struct PrinterProfile {
     pub (crate) printer_connection_data: PrinterConnectionData,
     /// Paper width, in characters, for the printer
     pub (crate) columns_per_font: HashMap<Font, u8>,
-    /// Total printer width in pixels, for image printing
-    pub (crate) width: u16
+    /// Total printer width in pixels, for image printing, when using certain image mode
+    pub (crate) width_per_image_mode: HashMap<ImageMode, u16>
 }
 
 impl PrinterProfile {
     /// Create custom printing details
     ///
     /// Not recommended to use, as it contains a lot of arguments. See one of the builders instead (at the moment, only [usb_builder](PrinterProfile::usb_builder) and [terminal_builder](PrinterProfile::terminal_builder) available).
-    pub fn new(printer_connection_data: PrinterConnectionData, columns_per_font: HashMap<Font, u8>, width: u16) -> PrinterProfile {
+    pub fn new(printer_connection_data: PrinterConnectionData, columns_per_font: HashMap<Font, u8>, width_per_image_mode: HashMap<ImageMode, u16>) -> PrinterProfile {
         PrinterProfile {
             printer_connection_data,
             columns_per_font,
-            width
+            width_per_image_mode
         }
     }
 
@@ -88,7 +88,7 @@ pub struct PrinterProfileBuilder {
     /// Columns that each font spans at maximum
     columns_per_font: HashMap<Font, u8>,
     /// Widtth, in dots, of the printer
-    width: u16
+    width_per_image_mode: HashMap<ImageMode, u16>
 }
 
 impl PrinterProfileBuilder {
@@ -102,7 +102,7 @@ impl PrinterProfileBuilder {
     ///
     /// The data structure will be properly built just with the vendor id and the product id. The [Printer](crate::Printer)'s [new](crate::Printer::new) method will try to locate a bulk write endpoint, but it might fail to do so. See [with_endpoint](PrinterProfileBuilder::with_endpoint) for manual setup.
     ///
-    /// By default, a width of 384 dots and the `FontA` with 32 columns of width will be loaded with the profile.
+    /// By default, a width of 384 dots for the `ImageMode::EightDotSingleDensity` image mode and the `FontA` with 32 columns of width will be loaded with the profile.
     pub fn new_usb(vendor_id: u16, product_id: u16) -> PrinterProfileBuilder {
         PrinterProfileBuilder {
             printer_connection_data: PrinterConnectionData::Usb {
@@ -112,7 +112,7 @@ impl PrinterProfileBuilder {
                 timeout: std::time::Duration::from_secs(2)
             },
             columns_per_font: vec![(Font::FontA, 32)].into_iter().collect(),
-            width: 384
+            width_per_image_mode: vec![(ImageMode::EightDotSingleDensity, 384)].into_iter().collect()
         }
     }
 
@@ -129,7 +129,7 @@ impl PrinterProfileBuilder {
         PrinterProfileBuilder {
             printer_connection_data: PrinterConnectionData::Terminal,
             columns_per_font: vec![(Font::FontA, 32)].into_iter().collect(),
-            width: 384
+            width_per_image_mode: vec![(ImageMode::EightDotSingleDensity, 384)].into_iter().collect()
         }
     }
 
@@ -161,14 +161,15 @@ impl PrinterProfileBuilder {
     ///     .with_width(384)
     ///     .build();
     /// ```
-    pub fn with_width(mut self, width: u16) -> PrinterProfileBuilder {
-        self.width = width;
+    pub fn with_image_mode_width(mut self, image_mode: ImageMode, width: u16) -> PrinterProfileBuilder {
+        self.width_per_image_mode.insert(image_mode, width);
         self
     }
 
     /// Adds a specific width per font
     ///
     /// This allows the justification, and proper word splitting to work. If you feel insecure about what value to use, the default font (FontA) usually has 32 characters of width for 58mm paper printers, and 48 for 80mm paper. You can also look for the specsheet, or do trial and error.
+    ///
     /// ```rust
     /// use escpos_rs::{PrinterProfileBuilder, command::Font};
     /// let printer_profile = PrinterProfileBuilder::new_usb(0x0001, 0x0001)
@@ -209,7 +210,7 @@ impl PrinterProfileBuilder {
         PrinterProfile {
             printer_connection_data: self.printer_connection_data,
             columns_per_font: self.columns_per_font,
-            width: self.width
+            width_per_image_mode: self.width_per_image_mode
         }
     }
 }

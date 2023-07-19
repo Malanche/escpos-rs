@@ -17,6 +17,8 @@ pub enum Error {
     UnsupportedFont,
     /// At least one font needs to be available in the profile
     NoFontFound,
+    /// If no image mode was detected during image printing
+    NoImageModeFound,
     /// Indicates that a builder method was called on the wrong printer connection
     UnsupportedForPrinterConnection,
     PrinterError(String),
@@ -40,6 +42,7 @@ impl std::fmt::Display for Error {
             Error::NoPrintData => "Print data must be supplied for this instruction".to_string(),
             Error::UnsupportedFont => "The specified font does not seem to be supported by the printer profile".to_string(),
             Error::NoFontFound => "No Font was found in the profile".to_string(),
+            Error::NoImageModeFound => "Image mode was not found in the profile".to_string(),
             Error::UnsupportedForPrinterConnection => "The called method does not work with the current printer connection".to_string(),
             Error::PrinterError(detail) => format!("An error occured while printing, {}", detail),
             Error::WrongMarkdown => "Incorrect markdown structure".to_string(),

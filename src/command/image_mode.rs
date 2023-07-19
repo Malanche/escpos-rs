@@ -3,13 +3,15 @@ use serde::{Serialize, Deserialize};
 /// Specifies de density of the image to be printer
 ///
 /// Not all densities are supported by all printers
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 pub enum ImageMode {
     EightDotSingleDensity,
     EightDotDoubleDensity,
     TwentyfourDotSingleDensity,
     TwentyfourDotDoubleDensity
 }
+
+impl Eq for ImageMode{}
 
 impl ImageMode {
     /// Returns the byte-array representation of each command

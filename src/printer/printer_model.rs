@@ -1,5 +1,5 @@
 use super::{PrinterProfile};
-use crate::{PrinterConnectionData, command::Font};
+use crate::{PrinterConnectionData, command::{Font, ImageMode}};
 
 /// Printers known to this library
 ///
@@ -36,7 +36,7 @@ impl PrinterModel {
                         timeout: std::time::Duration::from_secs(2)
                     },
                     columns_per_font: vec![(Font::FontA, 32), (Font::FontB, 42)].into_iter().collect(),
-                    width: 384
+                    width_per_image_mode: vec![(ImageMode::EightDotSingleDensity, 384)].into_iter().collect()
                 }
             },
             PrinterModel::TMT20 => {
@@ -48,7 +48,7 @@ impl PrinterModel {
                         timeout: std::time::Duration::from_secs(2)
                     },
                     columns_per_font: vec![(Font::FontA, 48)].into_iter().collect(),
-                    width: 576
+                    width_per_image_mode: vec![(ImageMode::EightDotSingleDensity, 576)].into_iter().collect()
                 }
             },
             PrinterModel::TMT88VI => {
@@ -60,7 +60,12 @@ impl PrinterModel {
                         timeout: std::time::Duration::from_secs(2)
                     },
                     columns_per_font: vec![(Font::FontA, 42), (Font::FontB, 56)].into_iter().collect(),
-                    width: 576
+                    width_per_image_mode: vec![
+                        (ImageMode::EightDotSingleDensity, 256),
+                        (ImageMode::EightDotDoubleDensity, 512),
+                        (ImageMode::TwentyfourDotSingleDensity, 256),
+                        (ImageMode::TwentyfourDotDoubleDensity, 512)
+                    ].into_iter().collect()
                 }
             }
         }
