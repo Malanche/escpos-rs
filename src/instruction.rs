@@ -332,8 +332,12 @@ impl Instruction {
                         let print_data = print_data.ok_or(Error::NoPrintData)?;
 
                         for key in self_replacements.iter() {
-                            if let Some(replacement) = print_data.replacements.get(key) {
-                                replaced_string = replaced_string.as_str().replace(key, replacement);
+                            if let Some(replacements) = &print_data.replacements {
+                                if let Some(replacement) = replacements.get(key) {
+                                    replaced_string = replaced_string.as_str().replace(key, replacement);
+                                } else {
+                                    return Err(Error::NoReplacementFound(key.clone()))
+                                }
                             } else {
                                 return Err(Error::NoReplacementFound(key.clone()))
                             }

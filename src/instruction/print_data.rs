@@ -1,13 +1,20 @@
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 /// Contains custom information for each print
 ///
 /// Some instructions require custom information in order to get printed. The [PrintData](self::PrintData) structure contains such custom information. The builder pattern is used to construct this structure, see [PrintDataBuilder](self::PrintDataBuilder).
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PrintData {
-    pub(crate) replacements: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) replacements: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) duo_tables: Option<HashMap<String, Vec<(String, String)>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) trio_tables: Option<HashMap<String, Vec<(String, String, String)>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) quad_tables: Option<HashMap<String, Vec<(String, String, String, String)>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) qr_contents: Option<HashMap<String, String>>
 }
 
@@ -16,11 +23,28 @@ impl PrintData {
     pub fn builder() -> PrintDataBuilder {
         PrintDataBuilder::new()
     }
+
+    /// Merges two instances of print data, where the caller (left hand side, or main instance) overrides the data of the callee (right hand side) in the case of a label collision.
+    pub fn merge(self, rhs: PrintData) -> PrintData {
+        let replacements: HashMap<_,_> = self.replacements.unwrap_or_else(|| HashMap::new()).into_iter().chain(rhs.replacements.unwrap_or_else(|| HashMap::new())).collect();
+        let duo_tables: HashMap<_,_> = self.duo_tables.unwrap_or_else(|| HashMap::new()).into_iter().chain(rhs.duo_tables.unwrap_or_else(|| HashMap::new())).collect();
+        let trio_tables: HashMap<_,_> = self.trio_tables.unwrap_or_else(|| HashMap::new()).into_iter().chain(rhs.trio_tables.unwrap_or_else(|| HashMap::new())).collect();
+        let quad_tables: HashMap<_,_> = self.quad_tables.unwrap_or_else(|| HashMap::new()).into_iter().chain(rhs.quad_tables.unwrap_or_else(|| HashMap::new())).collect();
+        let qr_contents: HashMap<_,_> = self.qr_contents.unwrap_or_else(|| HashMap::new()).into_iter().chain(rhs.qr_contents.unwrap_or_else(|| HashMap::new())).collect();
+
+        PrintData {
+            replacements: if replacements.is_empty() {None} else {Some(replacements)},
+            duo_tables: if duo_tables.is_empty() {None} else {Some(duo_tables)},
+            trio_tables: if trio_tables.is_empty() {None} else {Some(trio_tables)},
+            quad_tables: if quad_tables.is_empty() {None} else {Some(quad_tables)},
+            qr_contents: if qr_contents.is_empty() {None} else {Some(qr_contents)}
+        }
+    }
 }
 
 /// Helps build a valid [PrintData](self::PrintData)
 pub struct PrintDataBuilder {
-    replacements: HashMap<String, String>,
+    replacements: Option<HashMap<String, String>>,
     duo_tables: Option<HashMap<String, Vec<(String, String)>>>,
     trio_tables: Option<HashMap<String, Vec<(String, String, String)>>>,
     quad_tables: Option<HashMap<String, Vec<(String, String, String, String)>>>,
@@ -30,7 +54,7 @@ pub struct PrintDataBuilder {
 impl Default for PrintDataBuilder {
     fn default() -> Self {
         PrintDataBuilder {
-            replacements: HashMap::new(),
+            replacements: None,
             duo_tables: None,
             trio_tables: None,
             quad_tables: None,
@@ -59,7 +83,11 @@ impl PrintDataBuilder {
     ///
     /// Note that there is no particular syntax for the `target` string. `"%name%"` is used in the example so that the word "name" (in case it appears in the text) is safe from this instruction.
     pub fn replacement<A: Into<String>, B: Into<String>>(mut self, target: A, replacement: B) -> Self {
-        self.replacements.insert(target.into(), replacement.into());
+        if let Some(replacements) = &mut self.replacements {
+            replacements.insert(target.into(), replacement.into());
+        } else {
+            self.replacements = Some(vec![(target.into(), replacement.into())].into_iter().collect());
+        }
         self
     }
 
